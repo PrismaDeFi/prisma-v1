@@ -1,1 +1,1 @@
-# Prisma Rewards
+# Prisma v1
