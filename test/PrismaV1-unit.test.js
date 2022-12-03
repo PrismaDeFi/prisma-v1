@@ -58,7 +58,7 @@ describe("PrismaV1 Test", () => {
     )
     await prismaMultisig.transferOwnership(deployer.address)
 
-    const trackerAddress = await prismaToken.getTracker()
+    const trackerAddress = await prismaToken.getPrismaDividendTracker()
     tracker = await ethers.getContractAt(
       "PrismaDividendTracker",
       trackerAddress
@@ -87,36 +87,42 @@ describe("PrismaV1 Test", () => {
   describe("addLiquidity", () => {
     it("adds liquidity", async () => {
       await prismaToken.transfer(
-        tracker.address,
+        prismaToken.address,
         ethers.utils.parseEther("1000000")
       )
-      await busd.transfer(tracker.address, ethers.utils.parseEther("1000000"))
+      await busd.transfer(
+        prismaToken.address,
+        ethers.utils.parseEther("1000000")
+      )
       await prismaToken.addPrismaLiquidity(
         ethers.utils.parseEther("1000000"),
         ethers.utils.parseEther("1000000")
       )
-      const [reserveA, reserveB] = await prismaToken.checkPrismaLiquidity()
+      const [reserveA, reserveB] = await prismaToken.getPrismaLiquidity()
       assert.equal(reserveA.toString(), ethers.utils.parseEther("1000000"))
       assert.equal(reserveB.toString(), ethers.utils.parseEther("1000000"))
     })
   })
-  describe("swap", () => {
+  describe("swapExactBUSDForPrisma", () => {
     it("can swap", async () => {
       await prismaToken.transfer(
-        tracker.address,
+        prismaToken.address,
         ethers.utils.parseEther("1000000")
       )
-      await busd.transfer(tracker.address, ethers.utils.parseEther("1000000"))
+      await busd.transfer(
+        prismaToken.address,
+        ethers.utils.parseEther("1000000")
+      )
       await prismaToken.addPrismaLiquidity(
         ethers.utils.parseEther("1000000"),
         ethers.utils.parseEther("1000000")
       )
       await busd.transfer(tracker.address, ethers.utils.parseEther("10000"))
       const balanceBefore = await prismaToken.balanceOf(deployer.address)
-      const [, amountOutB] = await tracker.testAmountsOut(
+      const [, amountOutB] = await prismaToken.getPrismaAmountsOut(
         ethers.utils.parseEther("1000")
       )
-      await tracker.testSwap(ethers.utils.parseEther("1000"))
+      await prismaToken.swapExactBUSDForPrisma(ethers.utils.parseEther("1000"))
       const balanceAfter = await prismaToken.balanceOf(deployer.address)
       assert.equal(
         BigInt(balanceAfter) / BigInt(10 ** 18),
@@ -333,10 +339,13 @@ describe("PrismaV1 Test", () => {
     })
     it("can reinvest dividends", async () => {
       await prismaToken.transfer(
-        tracker.address,
+        prismaToken.address,
         ethers.utils.parseEther("1000000")
       )
-      await busd.transfer(tracker.address, ethers.utils.parseEther("1000000"))
+      await busd.transfer(
+        prismaToken.address,
+        ethers.utils.parseEther("1000000")
+      )
       await prismaToken.addPrismaLiquidity(
         ethers.utils.parseEther("1000000"),
         ethers.utils.parseEther("1000000")
@@ -353,7 +362,9 @@ describe("PrismaV1 Test", () => {
       const reinvestAmount = BigInt(
         (dividends * ((stakeBefore * 100) / prismaBalanceBefore)) / 100
       )
-      const [, amountOutB] = await tracker.testAmountsOut(reinvestAmount)
+      const [, amountOutB] = await prismaToken.getPrismaAmountsOut(
+        reinvestAmount
+      )
       await prismaToken.claim()
       const prismaBalanceAfter = await prismaToken.balanceOf(deployer.address)
       const busdBalanceAfter = await busd.balanceOf(deployer.address)

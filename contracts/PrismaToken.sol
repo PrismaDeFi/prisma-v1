@@ -6,7 +6,11 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20Snapshot
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "./PrismaDividendTracker.sol";
 
-contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
+contract PrismaToken is
+  IPrismaToken,
+  ERC20SnapshotUpgradeable,
+  OwnableUpgradeable
+{
   ///////////////
   // CONSTANTS //
   ///////////////
@@ -20,6 +24,7 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
 
   PrismaDividendTracker private prismaDividendTracker;
 
+  address public router;
   address public multisig;
   address public liquidityReceiver;
   address public treasuryReceiver;
@@ -103,6 +108,7 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
     _minStakeAmount = 10 * (10 ** 18); //Need to discuss this number
     _stakingEnabled = true;
 
+    router = _router;
     prismaDividendToken = _prismaDividendToken;
     prismaDividendTracker = new PrismaDividendTracker(
       _prismaDividendToken,
@@ -115,6 +121,39 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
       0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc
     ] = true; // development wallet
     _isFeeExempt[multisig] = true;
+  }
+
+  function addPrismaLiquidity(
+    uint256 prismaAmount,
+    uint256 busdAmount
+  ) external {
+    this.approve(router, prismaAmount);
+    IERC20(prismaDividendToken).approve(router, busdAmount);
+    IUniswapV2Router02(router).addLiquidity(
+      address(this),
+      prismaDividendToken,
+      prismaAmount,
+      busdAmount,
+      0,
+      0,
+      msg.sender, // during development only
+      block.timestamp
+    );
+  }
+
+  function swapExactBUSDForPrisma(uint256 amountIn) external {
+    IERC20(prismaDividendToken).approve(router, amountIn);
+    address[] memory path = new address[](2);
+    path[0] = prismaDividendToken;
+    path[1] = address(this);
+    IUniswapV2Router02(router)
+      .swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        amountIn,
+        0,
+        path,
+        msg.sender,
+        block.timestamp
+      );
   }
 
   ///////////
@@ -135,7 +174,13 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
    */
   function balanceOf(
     address account
-  ) public view virtual override returns (uint256) {
+  )
+    public
+    view
+    virtual
+    override(IPrismaToken, ERC20Upgradeable)
+    returns (uint256)
+  {
     return _balances[account];
   }
 
@@ -449,6 +494,24 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
     return _stakingEnabled;
   }
 
+  function getPrismaLiquidity()
+    external
+    view
+    returns (uint112, uint112, uint32)
+  {
+    address pair = prismaDividendTracker.pair();
+    return IUniswapV2Pair(pair).getReserves();
+  }
+
+  function getPrismaAmountsOut(
+    uint256 amountIn
+  ) external view returns (uint[] memory amounts) {
+    address[] memory path = new address[](2);
+    path[0] = prismaDividendToken;
+    path[1] = address(this);
+    return IUniswapV2Router02(router).getAmountsOut(amountIn, path);
+  }
+
   //////////////////////////
   // Dividends Processing //
   //////////////////////////
@@ -586,6 +649,10 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
   // Getter Functions //
   //////////////////////
 
+  function getPrismaDividendTracker() external view returns (address pair) {
+    return address(prismaDividendTracker);
+  }
+
   function getPrismaClaimWait() external view returns (uint256) {
     return prismaDividendTracker.claimWait();
   }
@@ -662,28 +729,5 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
     returns (uint256)
   {
     return prismaDividendTracker.getNumberOfTokenHolders();
-  }
-
-  ////////////////////////////////
-  // Debugging & Test Functions //
-  ////////////////////////////////
-
-  function getTracker() external view returns (address pair) {
-    return address(prismaDividendTracker);
-  }
-
-  function addPrismaLiquidity(
-    uint256 prismaAmount,
-    uint256 busdAmount
-  ) external {
-    prismaDividendTracker.addLiquidity(prismaAmount, busdAmount);
-  }
-
-  function checkPrismaLiquidity()
-    external
-    view
-    returns (uint112, uint112, uint32)
-  {
-    return prismaDividendTracker.checkLiquidity();
   }
 }
