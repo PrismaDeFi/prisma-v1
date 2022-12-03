@@ -320,31 +320,31 @@ describe("PrismaV1 Test", () => {
     ///////////////////////////////////////
     // Uncomment to fry your motherboard //
     ///////////////////////////////////////
-    it("processes dividends to multiple holders", async () => {
-      for (let i = 0; i < 1000; i++) {
-        wallet = ethers.Wallet.createRandom()
-        wallet = wallet.connect(ethers.provider)
-        await deployer.sendTransaction({
-          to: wallet.address,
-          value: ethers.utils.parseEther("0.5"),
-        })
-        await prismaToken.transfer(
-          wallet.address,
-          ethers.utils.parseEther("100000")
-        )
-        await prismaToken.setDividends(deployer.address, wallet.address)
-      }
-      await prismaToken.processDividends()
-      const balanceBefore = await busd.balanceOf(deployer.address)
-      const dividends = await prismaToken.withdrawablePrismaDividendOf(
-        deployer.address
-      )
-      await prismaToken.processDividendTracker("30000000")
-      assert.equal(
-        BigInt(await busd.balanceOf(deployer.address)) / BigInt(10 ** 18),
-        BigInt(balanceBefore) / BigInt(10 ** 18) +
-          BigInt(dividends) / BigInt(10 ** 18)
-      )
-    })
+    // it("processes dividends to multiple holders", async () => {
+    //   for (let i = 0; i < 1000; i++) {
+    //     wallet = ethers.Wallet.createRandom()
+    //     wallet = wallet.connect(ethers.provider)
+    //     await deployer.sendTransaction({
+    //       to: wallet.address,
+    //       value: ethers.utils.parseEther("0.5"),
+    //     })
+    //     await prismaToken.transfer(
+    //       wallet.address,
+    //       ethers.utils.parseEther("100000")
+    //     )
+    //     await prismaToken.setDividends(deployer.address, wallet.address)
+    //   }
+    //   await prismaToken.processDividends()
+    //   const balanceBefore = await busd.balanceOf(deployer.address)
+    //   const dividends = await prismaToken.withdrawablePrismaDividendOf(
+    //     deployer.address
+    //   )
+    //   await prismaToken.processDividendTracker("30000000")
+    //   assert.equal(
+    //     BigInt(await busd.balanceOf(deployer.address)) / BigInt(10 ** 18),
+    //     BigInt(balanceBefore) / BigInt(10 ** 18) +
+    //       BigInt(dividends) / BigInt(10 ** 18)
+    //   )
+    // })
   })
 })
