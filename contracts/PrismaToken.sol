@@ -4,6 +4,7 @@ pragma solidity 0.8.16;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20SnapshotUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "./PrismaDividendTracker.sol";
 
 contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
   ///////////////
@@ -17,9 +18,12 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
   // VARIABLES //
   ///////////////
 
+  PrismaDividendTracker private prismaDividendTracker;
+
   address public multisig;
   address public liquidityReceiver;
   address public treasuryReceiver;
+  address private prismaDividendToken;
 
   mapping(address => uint256) private _balances;
   mapping(address => mapping(address => uint256)) private _allowances;
@@ -29,6 +33,8 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
   mapping(address => bool) private _notStakingQualified;
 
   bool private _stakingEnabled;
+  bool private processDividendStatus = true;
+  bool private prismaDividendEnabled = true;
 
   uint256 private _totalSupply;
   uint256 private _buyLiquidityFee;
@@ -42,6 +48,32 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
   uint256 private _totalSellFees =
     _sellLiquidityFee + _sellTreasuryFee + _sellBurnFee;
   uint256 private _minStakeAmount;
+  uint256 private gasForProcessing = 300000;
+
+  ////////////
+  // Events //
+  ////////////
+
+  event PrismaDividendTracker_Updated(
+    address indexed newAddress,
+    address indexed oldAddress
+  );
+  event PrismaDividendEnabled_Updated(bool enabled);
+  event GasForProcessing_Updated(
+    uint256 indexed newValue,
+    uint256 indexed oldValue
+  );
+
+  event SendDividends(uint256 amount);
+
+  event PrismaDividendTracker_Processed(
+    uint256 iterations,
+    uint256 claims,
+    uint256 lastProcessedIndex,
+    bool indexed automatic,
+    uint256 gas,
+    address indexed processor
+  );
 
   /////////////////
   // INITIALIZER //
@@ -52,7 +84,10 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
    * All two of these values are immutable: they can only be set once during
    * construction.
    */
-  function init() public initializer {
+  function init(
+    address _prismaDividendToken,
+    address _router
+  ) public initializer {
     __Ownable_init();
     __ERC20Snapshot_init();
     __ERC20_init("Prisma Finance", "PRISMA");
@@ -67,6 +102,13 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
     _sellTreasuryFee = 2;
     _minStakeAmount = 10 * (10 ** 18); //Need to discuss this number
     _stakingEnabled = true;
+
+    prismaDividendToken = _prismaDividendToken;
+    prismaDividendTracker = new PrismaDividendTracker(
+      _prismaDividendToken,
+      _router,
+      address(this)
+    );
 
     _balances[msg.sender] = _totalSupply;
     _automatedMarketMakerPairs[
@@ -109,7 +151,7 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
     uint256 amount
   ) public virtual override returns (bool) {
     address owner = _msgSender();
-    _transfer(owner, to, amount);
+    _transferFrom(owner, to, amount);
     return true;
   }
 
@@ -137,7 +179,11 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
     uint256 amount
   ) public virtual override returns (bool) {
     address owner = _msgSender();
-    _approve(owner, spender, amount);
+    require(owner != address(0), "ERC20: approve from the zero address");
+    require(spender != address(0), "ERC20: approve to the zero address");
+
+    _allowances[owner][spender] = amount;
+    emit Approval(owner, spender, amount);
     return true;
   }
 
@@ -160,7 +206,7 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
   ) public virtual override returns (bool) {
     address spender = _msgSender();
     _spendAllowance(from, spender, amount);
-    _transfer(from, to, amount);
+    _transferFrom(from, to, amount);
     return true;
   }
 
@@ -178,16 +224,12 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
    * - `to` cannot be the zero address.
    * - `from` must have a balance of at least `amount`.
    */
-  function _transfer(
-    address from,
-    address to,
-    uint256 amount
-  ) internal virtual override {
+  function _transferFrom(address from, address to, uint256 amount) internal {
     require(from != address(0), "ERC20: transfer from the zero address");
     require(to != address(0), "ERC20: transfer to the zero address");
 
     uint256 fromBalance = _balances[from];
-    require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+    // require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
 
     uint256 fee;
 
@@ -405,5 +447,247 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
 
   function getStakingStatus() external view returns (bool) {
     return _stakingEnabled;
+  }
+
+  //////////////////////////
+  // Dividends Processing //
+  //////////////////////////
+
+  function claim() external {
+    prismaDividendTracker.processAccount(payable(msg.sender), false);
+  }
+
+  function setDividends(address from, address to) external {
+    uint256 fromBalance = IERC20(address(this)).balanceOf(from);
+    uint256 toBalance = IERC20(address(this)).balanceOf(to);
+    prismaDividendTracker.setBalance(payable(from), fromBalance);
+    prismaDividendTracker.setBalance(payable(to), toBalance);
+  }
+
+  function processDividends() public {
+    uint256 balance = prismaDividendTracker.balanceOf(msg.sender);
+    if (processDividendStatus) {
+      if (balance > 10000000000) {
+        // 0,00000001 BNB
+        uint256 dividends = IERC20(prismaDividendToken).balanceOf(
+          address(this)
+        );
+        transferDividends(
+          prismaDividendToken,
+          address(prismaDividendTracker),
+          prismaDividendTracker,
+          dividends
+        );
+      }
+    }
+  }
+
+  function processDividendTracker(uint256 gas) public onlyOwner {
+    (
+      uint256 Iterations,
+      uint256 Claims,
+      uint256 LastProcessedIndex
+    ) = prismaDividendTracker.process(gas);
+    emit PrismaDividendTracker_Processed(
+      Iterations,
+      Claims,
+      LastProcessedIndex,
+      false,
+      gas,
+      tx.origin
+    );
+  }
+
+  function transferDividends(
+    address dividendToken,
+    address dividendTracker,
+    DividendPayingToken dividendPayingTracker,
+    uint256 amount
+  ) private {
+    bool success = IERC20(dividendToken).transfer(dividendTracker, amount);
+    if (success) {
+      dividendPayingTracker.distributeDividends(amount);
+      emit SendDividends(amount);
+    }
+  }
+
+  //////////////////////
+  // Setter Functions //
+  //////////////////////
+
+  function setProcessDividendStatus(bool _active) external onlyOwner {
+    processDividendStatus = _active;
+  }
+
+  function setPrismaDividendEnabled(bool _enabled) external onlyOwner {
+    prismaDividendEnabled = _enabled;
+  }
+
+  function setPrismaDividendToken(
+    address _prismaDividendToken
+  ) external onlyOwner {
+    prismaDividendToken = _prismaDividendToken;
+  }
+
+  function updatePrismaDividendTracker(address newAddress) external onlyOwner {
+    require(
+      newAddress != address(prismaDividendTracker),
+      "The dividend tracker already has that address"
+    );
+    PrismaDividendTracker new_prismaDividendTracker = PrismaDividendTracker(
+      payable(newAddress)
+    );
+    new_prismaDividendTracker.excludeFromDividends(
+      address(new_prismaDividendTracker)
+    );
+    new_prismaDividendTracker.excludeFromDividends(address(this));
+    emit PrismaDividendTracker_Updated(
+      newAddress,
+      address(new_prismaDividendTracker)
+    );
+    prismaDividendTracker = new_prismaDividendTracker;
+  }
+
+  function excludeFromDividend(address account) public onlyOwner {
+    prismaDividendTracker.excludeFromDividends(address(account));
+  }
+
+  function updateGasForProcessing(uint256 newValue) external onlyOwner {
+    require(
+      newValue != gasForProcessing,
+      "Cannot update gasForProcessing to same value"
+    );
+    gasForProcessing = newValue;
+    emit GasForProcessing_Updated(newValue, gasForProcessing);
+  }
+
+  function updateMinimumBalanceForDividends(
+    uint256 newMinimumBalance
+  ) external onlyOwner {
+    prismaDividendTracker.updateMinimumTokenBalanceForDividends(
+      newMinimumBalance
+    );
+  }
+
+  function updateClaimWait(uint256 claimWait) external onlyOwner {
+    prismaDividendTracker.updateClaimWait(claimWait);
+  }
+
+  function updatePrismaDividendToken(
+    address _newContract,
+    uint256 gas
+  ) external onlyOwner {
+    prismaDividendTracker.process(gas);
+    prismaDividendToken = _newContract;
+    prismaDividendTracker.setDividendTokenAddress(_newContract);
+  }
+
+  //////////////////////
+  // Getter Functions //
+  //////////////////////
+
+  function getPrismaClaimWait() external view returns (uint256) {
+    return prismaDividendTracker.claimWait();
+  }
+
+  function getTotalPrismaDividendsDistributed()
+    external
+    view
+    returns (uint256)
+  {
+    return prismaDividendTracker.totalDividendsDistributed();
+  }
+
+  function withdrawablePrismaDividendOf(
+    address account
+  ) external view returns (uint256) {
+    return prismaDividendTracker.withdrawableDividendOf(account);
+  }
+
+  function prismaDividendTokenBalanceOf(
+    address account
+  ) public view returns (uint256) {
+    return prismaDividendTracker.balanceOf(account);
+  }
+
+  function getAccountPrismaDividendsInfo(
+    address account
+  )
+    external
+    view
+    returns (
+      address,
+      int256,
+      int256,
+      uint256,
+      uint256,
+      uint256,
+      uint256,
+      uint256
+    )
+  {
+    return prismaDividendTracker.getAccount(account);
+  }
+
+  function getAccountPrismaDividendsInfoAtIndex(
+    uint256 index
+  )
+    external
+    view
+    returns (
+      address,
+      int256,
+      int256,
+      uint256,
+      uint256,
+      uint256,
+      uint256,
+      uint256
+    )
+  {
+    return prismaDividendTracker.getAccountAtIndex(index);
+  }
+
+  function getLastPrismaDividendProcessedIndex()
+    external
+    view
+    returns (uint256)
+  {
+    return prismaDividendTracker.getLastProcessedIndex();
+  }
+
+  function getNumberOfPrismaDividendTokenHolders()
+    external
+    view
+    returns (uint256)
+  {
+    return prismaDividendTracker.getNumberOfTokenHolders();
+  }
+
+  function getTracker() external view returns (address pair) {
+    return address(prismaDividendTracker);
+  }
+
+  function PrismaPair() external view returns (address) {
+    return prismaDividendTracker.prismaPair();
+  }
+
+  function GetPrismaPair() external view returns (address) {
+    return prismaDividendTracker.getPrismaPair();
+  }
+
+  function addPrismaLiquidity(
+    uint256 prismaAmount,
+    uint256 busdAmount
+  ) external {
+    prismaDividendTracker.addLiquidity(prismaAmount, busdAmount);
+  }
+
+  function checkPrismaLiquidity()
+    external
+    view
+    returns (uint112, uint112, uint32)
+  {
+    return prismaDividendTracker.checkLiquidity();
   }
 }
