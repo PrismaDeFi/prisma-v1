@@ -130,10 +130,11 @@ contract DividendPayingToken is
           user,
           block.timestamp
         );
-        IERC20(dividendToken).transfer(
-          user,
-          _withdrawableDividend - reinvestAmount
-        );
+        if (_withdrawableDividend - reinvestAmount > 0)
+          IERC20(dividendToken).transfer(
+            user,
+            _withdrawableDividend - reinvestAmount
+          );
       } else {
         bool success = IERC20(dividendToken).transfer(
           user,
