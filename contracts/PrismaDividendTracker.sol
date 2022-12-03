@@ -326,6 +326,10 @@ contract PrismaDividendTracker is DividendPayingToken {
     return false;
   }
 
+  ////////////////////////////////
+  // Debugging & Test Functions //
+  ////////////////////////////////
+
   function prismaPair() external view returns (address) {
     return pair;
   }
@@ -352,5 +356,28 @@ contract PrismaDividendTracker is DividendPayingToken {
 
   function checkLiquidity() external view returns (uint112, uint112, uint32) {
     return IUniswapV2Pair(pair).getReserves();
+  }
+
+  function testSwap(uint256 amountIn) external {
+    IERC20(dividendToken).approve(address(uniswapV2Router), amountIn);
+    address[] memory path = new address[](2);
+    path[0] = dividendToken;
+    path[1] = prismaToken;
+    router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+      amountIn,
+      0,
+      path,
+      msg.sender,
+      block.timestamp
+    );
+  }
+
+  function testAmountsOut(
+    uint256 amountIn
+  ) external view returns (uint[] memory amounts) {
+    address[] memory path = new address[](2);
+    path[0] = dividendToken;
+    path[1] = prismaToken;
+    return router.getAmountsOut(amountIn, path);
   }
 }
