@@ -672,14 +672,6 @@ contract PrismaToken is ERC20SnapshotUpgradeable, OwnableUpgradeable {
     return address(prismaDividendTracker);
   }
 
-  function PrismaPair() external view returns (address) {
-    return prismaDividendTracker.prismaPair();
-  }
-
-  function GetPrismaPair() external view returns (address) {
-    return prismaDividendTracker.getPrismaPair();
-  }
-
   function addPrismaLiquidity(
     uint256 prismaAmount,
     uint256 busdAmount

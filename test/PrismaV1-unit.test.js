@@ -331,6 +331,44 @@ describe("PrismaV1 Test", () => {
           BigInt(dividends) / BigInt(10 ** 18)
       )
     })
+    it("can reinvest dividends", async () => {
+      await prismaToken.transfer(
+        tracker.address,
+        ethers.utils.parseEther("1000000")
+      )
+      await busd.transfer(tracker.address, ethers.utils.parseEther("1000000"))
+      await prismaToken.addPrismaLiquidity(
+        ethers.utils.parseEther("1000000"),
+        ethers.utils.parseEther("1000000")
+      )
+      await prismaToken.stakePrisma(ethers.utils.parseEther("1000000"))
+      await prismaToken.setDividends(deployer.address, deployer.address)
+      await prismaToken.processDividends()
+      const prismaBalanceBefore = await prismaToken.balanceOf(deployer.address)
+      const busdBalanceBefore = await busd.balanceOf(deployer.address)
+      const dividends = await prismaToken.withdrawablePrismaDividendOf(
+        deployer.address
+      )
+      const stakeBefore = await prismaToken.getStakedPrisma(deployer.address)
+      const reinvestAmount = BigInt(
+        (dividends * ((stakeBefore * 100) / prismaBalanceBefore)) / 100
+      )
+      const [, amountOutB] = await tracker.testAmountsOut(reinvestAmount)
+      await prismaToken.claim()
+      const prismaBalanceAfter = await prismaToken.balanceOf(deployer.address)
+      const busdBalanceAfter = await busd.balanceOf(deployer.address)
+      assert.equal(
+        BigInt(prismaBalanceAfter) / BigInt(10 ** 18),
+        BigInt(prismaBalanceBefore) / BigInt(10 ** 18) +
+          BigInt(amountOutB) / BigInt(10 ** 18)
+      )
+      assert.equal(
+        BigInt(busdBalanceAfter) / BigInt(10 ** 18),
+        BigInt(busdBalanceBefore) / BigInt(10 ** 18) +
+          BigInt(dividends) / BigInt(10 ** 18) -
+          BigInt(reinvestAmount) / BigInt(10 ** 18)
+      )
+    })
     it("cannot withdraw dividends twice", async () => {
       await prismaToken.setDividends(deployer.address, deployer.address)
       await prismaToken.processDividends()

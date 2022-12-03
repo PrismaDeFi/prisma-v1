@@ -5,6 +5,7 @@ pragma solidity 0.8.16;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "./IDividendPayingToken.sol";
 import "./IDividendPayingTokenOptional.sol";
+import "../IPrismaToken.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
@@ -31,6 +32,7 @@ contract DividendPayingToken is
   address public prismaToken;
 
   IUniswapV2Router02 public uniswapV2Router;
+  IPrismaToken public prisma;
 
   /**
    * @dev About dividendCorrection:
@@ -60,6 +62,7 @@ contract DividendPayingToken is
   ) ERC20(_name, _symbol) {
     dividendToken = _token;
     prismaToken = _prisma;
+    prisma = IPrismaToken(_prisma);
     uniswapV2Router = IUniswapV2Router02(_router);
   }
 
@@ -111,16 +114,25 @@ contract DividendPayingToken is
         withdrawnDividends[user] +
         _withdrawableDividend;
 
-      if (compoundPrisma[user]) {
+      uint256 stakedAmount = prisma.getStakedPrisma(user);
+      if (stakedAmount > 0) {
+        uint256 prismaBalance = prisma.balanceOf(user);
+        uint256 reinvestAmount = (_withdrawableDividend *
+          ((stakedAmount * magnitude) / prismaBalance)) / magnitude;
+        IERC20(dividendToken).approve(address(uniswapV2Router), reinvestAmount);
         address[] memory path = new address[](2);
         path[0] = dividendToken;
         path[1] = prismaToken;
         uniswapV2Router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
-          _withdrawableDividend,
+          reinvestAmount,
           0,
           path,
           user,
           block.timestamp
+        );
+        IERC20(dividendToken).transfer(
+          user,
+          _withdrawableDividend - reinvestAmount
         );
       } else {
         bool success = IERC20(dividendToken).transfer(
