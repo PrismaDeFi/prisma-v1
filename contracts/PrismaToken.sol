@@ -174,13 +174,7 @@ contract PrismaToken is
    */
   function balanceOf(
     address account
-  )
-    public
-    view
-    virtual
-    override(IPrismaToken, ERC20Upgradeable)
-    returns (uint256)
-  {
+  ) public view virtual override returns (uint256) {
     return _balances[account];
   }
 

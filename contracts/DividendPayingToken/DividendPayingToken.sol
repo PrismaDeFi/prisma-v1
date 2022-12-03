@@ -116,7 +116,7 @@ contract DividendPayingToken is
 
       uint256 stakedAmount = prisma.getStakedPrisma(user);
       if (stakedAmount > 0) {
-        uint256 prismaBalance = prisma.balanceOf(user);
+        uint256 prismaBalance = this.balanceOf(user);
         uint256 reinvestAmount = (_withdrawableDividend *
           ((stakedAmount * magnitude) / prismaBalance)) / magnitude;
         IERC20(dividendToken).approve(address(uniswapV2Router), reinvestAmount);
