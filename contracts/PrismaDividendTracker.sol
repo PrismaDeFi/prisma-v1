@@ -4,10 +4,11 @@ pragma solidity 0.8.16;
 
 import "./DividendPayingToken/DividendPayingToken.sol";
 import "./IterableMapping/IterableMapping.sol";
+import "./IPrismaDividendTracker.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 
-contract PrismaDividendTracker is DividendPayingToken {
+contract PrismaDividendTracker is IPrismaDividendTracker, DividendPayingToken {
   using IterableMapping for IterableMapping.Map;
 
   IterableMapping.Map private tokenHoldersMap;
@@ -31,19 +32,18 @@ contract PrismaDividendTracker is DividendPayingToken {
    * @notice Creates an ERC20 token that will be used to track dividends
    * @dev Sets minimum wait between dividend claims and minimum balance to be eligible
    */
-  constructor(
+  function init(
     address _dividentToken,
     address _router,
     address _prisma
-  )
-    DividendPayingToken(
-      "Prisma Tracker",
-      "PRISMA_TRACKER",
-      _dividentToken,
-      _router,
-      _prisma
-    )
-  {
+  ) public initializer {
+    __Ownable_init();
+    __ERC20_init("Prisma Tracker", "PRISMA_TRACKER");
+    dividendToken = _dividentToken;
+    prismaToken = _prisma;
+    prisma = IPrismaToken(_prisma);
+    uniswapV2Router = IUniswapV2Router02(_router);
+
     claimWait = 60;
     minimumTokenBalanceForDividends = 1000 * (10 ** 18);
 
@@ -55,12 +55,40 @@ contract PrismaDividendTracker is DividendPayingToken {
     pair = _uniswapV2Pair;
   }
 
+  function balanceOf(
+    address account
+  )
+    public
+    view
+    override(ERC20Upgradeable, IPrismaDividendTracker)
+    returns (uint256)
+  {
+    return super.balanceOf(account);
+  }
+
+  function distributeDividends(
+    uint256 amount
+  ) public override(DividendPayingToken, IPrismaDividendTracker) {
+    super.distributeDividends(amount);
+  }
+
+  function withdrawableDividendOf(
+    address _owner
+  )
+    public
+    view
+    override(DividendPayingToken, IPrismaDividendTracker)
+    returns (uint256)
+  {
+    return super.withdrawableDividendOf(_owner);
+  }
+
   /**
    * @dev See natspec in `DividendPayingToken.sol`
    */
   function setDividendTokenAddress(
     address newToken
-  ) external override onlyOwner {
+  ) external override(DividendPayingToken, IPrismaDividendTracker) onlyOwner {
     dividendToken = newToken;
   }
 
@@ -224,7 +252,7 @@ contract PrismaDividendTracker is DividendPayingToken {
    * @notice Used to check if an account is ready to claim
    * @return bool is ready to claim
    */
-  function canAutoClaim(uint256 lastClaimTime) private view returns (bool) {
+  function canAutoClaim(uint256 lastClaimTime) public view returns (bool) {
     if (lastClaimTime > block.timestamp) {
       return false;
     }
@@ -324,5 +352,30 @@ contract PrismaDividendTracker is DividendPayingToken {
     }
 
     return false;
+  }
+
+  /**
+   * @notice Returns Prisma/BUSD pair
+   * @return address UniswapV2Pair address
+   */
+  function getPair() external view returns (address) {
+    return pair;
+  }
+
+  /**
+   * @notice Returns the wait between manual dividend claims
+   * @dev Can be set `updateClaimWait`
+   * @return uint256 Claim wait in seconds
+   */
+  function getDividendClaimWait() external view returns (uint256) {
+    return claimWait;
+  }
+
+  /**
+   * @notice Returns the total amount of dividends distributed by the contract
+   *
+   */
+  function getTotalDividendsDistributed() external view returns (uint256) {
+    return totalDividendsDistributed;
   }
 }

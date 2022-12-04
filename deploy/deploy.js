@@ -49,6 +49,13 @@ module.exports = async ({ deployments }) => {
     log: true,
   })
   log(`PrismaToken deployed at ${prismaToken.address}`)
+
+  const prismaDividendTracker = await deploy("PrismaDividendTracker", {
+    from: deployer.address,
+    args: [],
+    log: true,
+  })
+  log(`PrismaDividendTracker deployed at ${prismaDividendTracker.address}`)
 }
 
 module.exports.tags = ["rewards", "all"]

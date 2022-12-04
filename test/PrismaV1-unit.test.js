@@ -3,9 +3,9 @@ const { deployments, ethers } = require("hardhat")
 
 describe("PrismaV1 Test", () => {
   let prismaToken,
+    tracker,
     wbnb,
     busd,
-    tracker,
     deployer,
     user,
     multisig,
@@ -19,6 +19,7 @@ describe("PrismaV1 Test", () => {
     await deployments.fixture("all")
 
     prismaToken = await ethers.getContract("PrismaToken", deployer)
+    tracker = await ethers.getContract("PrismaDividendTracker", deployer)
     busd = await ethers.getContract("MockBUSDToken", deployer)
     wbnb = await ethers.getContract("MockWBNBToken", deployer)
 
@@ -47,7 +48,11 @@ describe("PrismaV1 Test", () => {
     await this.router.deployTransaction.wait()
 
     prismaMultisig = prismaToken.connect(multisig)
-    await prismaMultisig.init(busd.address, this.router.address)
+    await prismaMultisig.init(
+      busd.address,
+      this.router.address,
+      tracker.address
+    )
     await prismaMultisig.transfer(
       deployer.address,
       ethers.utils.parseEther("100000000")
@@ -58,15 +63,12 @@ describe("PrismaV1 Test", () => {
     )
     await prismaMultisig.transferOwnership(deployer.address)
 
-    const trackerAddress = await prismaToken.getPrismaDividendTracker()
-    tracker = await ethers.getContractAt(
-      "PrismaDividendTracker",
-      trackerAddress
-    )
+    await tracker.init(busd.address, this.router.address, prismaToken.address)
+    await tracker.transferOwnership(prismaToken.address)
 
     await busd.transfer(prismaToken.address, ethers.utils.parseEther("1000000"))
   })
-  describe("constructor", () => {
+  describe("init", () => {
     it("initialized correctly", async () => {
       const name = await prismaToken.name()
       const symbol = await prismaToken.symbol()
@@ -76,11 +78,14 @@ describe("PrismaV1 Test", () => {
         (await prismaToken.totalSupply()).toString(),
         ethers.utils.parseEther("100000000")
       )
-      assert.equal((await prismaToken.getPrismaClaimWait()).toString(), "60")
+      assert.equal(
+        (await prismaToken.getPrismaDividendClaimWait()).toString(),
+        "60"
+      )
     })
     it("cannot be reinizialized", async () => {
       await expect(
-        prismaToken.init(busd.address, this.router.address)
+        prismaToken.init(busd.address, this.router.address, tracker.address)
       ).to.be.revertedWith("Initializable: contract is already initialized")
     })
   })

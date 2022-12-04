@@ -2,12 +2,12 @@
 
 pragma solidity 0.8.16;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "./IDividendPayingToken.sol";
 import "./IDividendPayingTokenOptional.sol";
 import "../IPrismaToken.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 /**
  * @title Dividend-Paying Token
@@ -15,10 +15,10 @@ import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
  *  to token holders as dividends and allows token holders to withdraw their dividends.
  */
 contract DividendPayingToken is
-  ERC20,
+  ERC20Upgradeable,
   IDividendPayingToken,
   IDividendPayingTokenOptional,
-  Ownable
+  OwnableUpgradeable
 {
   /**
    * @dev With `magnitude`, we can properly distribute dividends even if the amount of received ether is small.
@@ -55,19 +55,6 @@ contract DividendPayingToken is
 
   event DividendReinvested(address indexed to, uint256 weiAmount);
 
-  constructor(
-    string memory _name,
-    string memory _symbol,
-    address _token,
-    address _router,
-    address _prisma
-  ) ERC20(_name, _symbol) {
-    dividendToken = _token;
-    prismaToken = _prisma;
-    prisma = IPrismaToken(_prisma);
-    uniswapV2Router = IUniswapV2Router02(_router);
-  }
-
   /**
    * @notice Distributes ether to token holders as dividends.
    * @dev It reverts if the total supply of tokens is 0.
@@ -83,7 +70,7 @@ contract DividendPayingToken is
    *     but keeping track of such data on-chain costs much more than
    *     the saved ether, so we don't do that.
    */
-  function distributeDividends(uint256 amount) public onlyOwner {
+  function distributeDividends(uint256 amount) public virtual onlyOwner {
     require(totalSupply() > 0);
 
     if (amount > 0) {
@@ -120,7 +107,7 @@ contract DividendPayingToken is
 
       if (_netWithdrawableDividend > 0) {
         // either some amount is reinvested or nothing is reinvested
-        bool success = IERC20(dividendToken).transfer(
+        bool success = IERC20Upgradeable(dividendToken).transfer(
           user,
           _netWithdrawableDividend
         );
@@ -175,7 +162,7 @@ contract DividendPayingToken is
    */
   function withdrawableDividendOf(
     address _owner
-  ) public view override returns (uint256) {
+  ) public view virtual override returns (uint256) {
     return accumulativeDividendOf(_owner) - withdrawnDividends[_owner];
   }
 
@@ -289,7 +276,10 @@ contract DividendPayingToken is
       reinvestAmount =
         (_withdrawableDividend * ((stakedPrisma * magnitude) / prismaBalance)) /
         magnitude;
-      IERC20(dividendToken).approve(address(uniswapV2Router), reinvestAmount);
+      IERC20Upgradeable(dividendToken).approve(
+        address(uniswapV2Router),
+        reinvestAmount
+      );
       address[] memory path = new address[](2);
       path[0] = dividendToken;
       path[1] = prismaToken;
