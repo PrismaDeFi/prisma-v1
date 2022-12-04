@@ -131,12 +131,6 @@ interface IPrismaDividendTracker {
   function distributeDividends(uint256 amount) external;
 
   /**
-   * @notice Returns Prisma/BUSD pair
-   * @return address UniswapV2Pair address
-   */
-  function getPair() external view returns (address);
-
-  /**
    * @dev Returns the amount of tokens owned by `account`.
    */
   function balanceOf(address account) external view returns (uint256);

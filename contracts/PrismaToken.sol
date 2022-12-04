@@ -117,43 +117,9 @@ contract PrismaToken is
     prismaDividendTracker = IPrismaDividendTracker(_tracker);
 
     _balances[msg.sender] = _totalSupply;
-    _automatedMarketMakerPairs[
-      0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc
-    ] = true; // development wallet
+    _automatedMarketMakerPairs[_router] = true;
     _isFeeExempt[multisig] = true;
-  }
-
-  function addPrismaLiquidity(
-    uint256 prismaAmount,
-    uint256 busdAmount
-  ) external {
-    this.approve(router, prismaAmount);
-    IERC20Upgradeable(prismaDividendToken).approve(router, busdAmount);
-    IUniswapV2Router02(router).addLiquidity(
-      address(this),
-      prismaDividendToken,
-      prismaAmount,
-      busdAmount,
-      0,
-      0,
-      msg.sender, // during development only
-      block.timestamp
-    );
-  }
-
-  function swapExactBUSDForPrisma(uint256 amountIn) external {
-    IERC20Upgradeable(prismaDividendToken).approve(router, amountIn);
-    address[] memory path = new address[](2);
-    path[0] = prismaDividendToken;
-    path[1] = address(this);
-    IUniswapV2Router02(router)
-      .swapExactTokensForTokensSupportingFeeOnTransferTokens(
-        amountIn,
-        0,
-        path,
-        msg.sender,
-        block.timestamp
-      );
+    _isFeeExempt[_tracker] = true;
   }
 
   ///////////
@@ -488,24 +454,6 @@ contract PrismaToken is
     return _stakingEnabled;
   }
 
-  function getPrismaLiquidity()
-    external
-    view
-    returns (uint112, uint112, uint32)
-  {
-    address pair = prismaDividendTracker.getPair();
-    return IUniswapV2Pair(pair).getReserves();
-  }
-
-  function getPrismaAmountsOut(
-    uint256 amountIn
-  ) external view returns (uint[] memory amounts) {
-    address[] memory path = new address[](2);
-    path[0] = prismaDividendToken;
-    path[1] = address(this);
-    return IUniswapV2Router02(router).getAmountsOut(amountIn, path);
-  }
-
   //////////////////////////
   // Dividends Processing //
   //////////////////////////
@@ -589,24 +537,24 @@ contract PrismaToken is
     prismaDividendToken = _prismaDividendToken;
   }
 
-  // function updatePrismaDividendTracker(address newAddress) external onlyOwner {
-  //   require(
-  //     newAddress != address(prismaDividendTracker),
-  //     "The dividend tracker already has that address"
-  //   );
-  //   PrismaDividendTracker new_prismaDividendTracker = PrismaDividendTracker(
-  //     payable(newAddress)
-  //   );
-  //   new_prismaDividendTracker.excludeFromDividends(
-  //     address(new_prismaDividendTracker)
-  //   );
-  //   new_prismaDividendTracker.excludeFromDividends(address(this));
-  //   emit PrismaDividendTracker_Updated(
-  //     newAddress,
-  //     address(new_prismaDividendTracker)
-  //   );
-  //   prismaDividendTracker = new_prismaDividendTracker;
-  // }
+  function updatePrismaDividendTracker(address newAddress) external onlyOwner {
+    require(
+      newAddress != address(prismaDividendTracker),
+      "The dividend tracker already has that address"
+    );
+    IPrismaDividendTracker new_IPrismaDividendTracker = IPrismaDividendTracker(
+      newAddress
+    );
+    new_IPrismaDividendTracker.excludeFromDividends(
+      address(new_IPrismaDividendTracker)
+    );
+    new_IPrismaDividendTracker.excludeFromDividends(address(this));
+    emit PrismaDividendTracker_Updated(
+      newAddress,
+      address(new_IPrismaDividendTracker)
+    );
+    prismaDividendTracker = new_IPrismaDividendTracker;
+  }
 
   function excludeFromDividend(address account) public onlyOwner {
     prismaDividendTracker.excludeFromDividends(address(account));

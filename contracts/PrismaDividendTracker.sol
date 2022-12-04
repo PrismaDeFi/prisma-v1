@@ -355,14 +355,6 @@ contract PrismaDividendTracker is IPrismaDividendTracker, DividendPayingToken {
   }
 
   /**
-   * @notice Returns Prisma/BUSD pair
-   * @return address UniswapV2Pair address
-   */
-  function getPair() external view returns (address) {
-    return pair;
-  }
-
-  /**
    * @notice Returns the wait between manual dividend claims
    * @dev Can be set `updateClaimWait`
    * @return uint256 Claim wait in seconds

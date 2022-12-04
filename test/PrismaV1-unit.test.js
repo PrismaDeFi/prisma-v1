@@ -1,6 +1,8 @@
 const { assert, expect } = require("chai")
 const { deployments, ethers } = require("hardhat")
 
+const INITIAL_LIQUIDITY = ethers.utils.parseEther("1000000")
+
 describe("PrismaV1 Test", () => {
   let prismaToken,
     tracker,
@@ -10,11 +12,9 @@ describe("PrismaV1 Test", () => {
     user,
     multisig,
     liquidity,
-    treasury,
-    market
+    treasury
   beforeEach(async () => {
-    ;[deployer, user, multisig, liquidity, treasury, market] =
-      await ethers.getSigners()
+    ;[deployer, user, multisig, liquidity, treasury] = await ethers.getSigners()
 
     await deployments.fixture("all")
 
@@ -58,7 +58,7 @@ describe("PrismaV1 Test", () => {
       ethers.utils.parseEther("100000000")
     )
     await prismaMultisig.transfer(
-      market.address,
+      this.router.address,
       ethers.utils.parseEther("1000000")
     )
     await prismaMultisig.transferOwnership(deployer.address)
@@ -67,6 +67,25 @@ describe("PrismaV1 Test", () => {
     await tracker.transferOwnership(prismaToken.address)
 
     await busd.transfer(prismaToken.address, ethers.utils.parseEther("1000000"))
+
+    await prismaToken.approve(this.router.address, INITIAL_LIQUIDITY)
+    await busd.approve(this.router.address, INITIAL_LIQUIDITY)
+    await this.router.addLiquidity(
+      prismaToken.address,
+      busd.address,
+      INITIAL_LIQUIDITY,
+      INITIAL_LIQUIDITY,
+      0,
+      0,
+      deployer.address,
+      (await ethers.provider.getBlock()).timestamp + 100
+    )
+
+    const pairAddress = await this.factory.getPair(
+      prismaToken.address,
+      busd.address
+    )
+    this.pair = await ethers.getContractAt("IUniswapV2Pair", pairAddress)
   })
   describe("init", () => {
     it("initialized correctly", async () => {
@@ -88,111 +107,81 @@ describe("PrismaV1 Test", () => {
         prismaToken.init(busd.address, this.router.address, tracker.address)
       ).to.be.revertedWith("Initializable: contract is already initialized")
     })
-  })
-  describe("addLiquidity", () => {
-    it("adds liquidity", async () => {
-      await prismaToken.transfer(
-        prismaToken.address,
-        ethers.utils.parseEther("1000000")
-      )
-      await busd.transfer(
-        prismaToken.address,
-        ethers.utils.parseEther("1000000")
-      )
-      await prismaToken.addPrismaLiquidity(
-        ethers.utils.parseEther("1000000"),
-        ethers.utils.parseEther("1000000")
-      )
-      const [reserveA, reserveB] = await prismaToken.getPrismaLiquidity()
+    it("has liquidity", async () => {
+      const [reserveA, reserveB] = await this.pair.getReserves()
       assert.equal(reserveA.toString(), ethers.utils.parseEther("1000000"))
       assert.equal(reserveB.toString(), ethers.utils.parseEther("1000000"))
     })
   })
-  describe("swapExactBUSDForPrisma", () => {
-    it("can swap", async () => {
-      await prismaToken.transfer(
-        prismaToken.address,
-        ethers.utils.parseEther("1000000")
+  describe("_transferFrom", () => {
+    it("buy orders are taxed correctly", async () => {
+      const amountIn = ethers.utils.parseEther("10000")
+      const path = [busd.address, prismaToken.address]
+      await busd.approve(this.router.address, amountIn)
+      const prismaBalanceBefore = await prismaToken.balanceOf(deployer.address)
+      const busdBalanceBefore = await busd.balanceOf(deployer.address)
+      const [, amountOutB] = await this.router.getAmountsOut(amountIn, path)
+      await this.router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        amountIn,
+        0,
+        path,
+        deployer.address,
+        (await ethers.provider.getBlock()).timestamp + 100
       )
-      await busd.transfer(
-        prismaToken.address,
-        ethers.utils.parseEther("1000000")
-      )
-      await prismaToken.addPrismaLiquidity(
-        ethers.utils.parseEther("1000000"),
-        ethers.utils.parseEther("1000000")
-      )
-      await busd.transfer(tracker.address, ethers.utils.parseEther("10000"))
-      const balanceBefore = await prismaToken.balanceOf(deployer.address)
-      const [, amountOutB] = await prismaToken.getPrismaAmountsOut(
-        ethers.utils.parseEther("1000")
-      )
-      await prismaToken.swapExactBUSDForPrisma(ethers.utils.parseEther("1000"))
-      const balanceAfter = await prismaToken.balanceOf(deployer.address)
+      const prismaBalanceAfter = await prismaToken.balanceOf(deployer.address)
+      const busdBalanceAfter = await busd.balanceOf(deployer.address)
       assert.equal(
-        BigInt(balanceAfter) / BigInt(10 ** 18),
-        BigInt(balanceBefore) / BigInt(10 ** 18) +
+        BigInt(prismaBalanceAfter) / BigInt(10 ** 18),
+        BigInt(prismaBalanceBefore) / BigInt(10 ** 18) +
           BigInt(amountOutB) / BigInt(10 ** 18)
       )
+      assert.equal(
+        BigInt(busdBalanceAfter) / BigInt(10 ** 18),
+        BigInt(busdBalanceBefore) / BigInt(10 ** 18) -
+          BigInt(amountIn) / BigInt(10 ** 18)
+      )
     })
-  })
-  describe("transfer", () => {
-    it("can transfer", async () => {
+    it("sell orders are taxed correctly", async () => {
+      const amountIn = ethers.utils.parseEther("10000")
+      const path = [prismaToken.address, busd.address]
+      await prismaToken.approve(this.router.address, amountIn)
+      const prismaBalanceBefore = await prismaToken.balanceOf(deployer.address)
+      const busdBalanceBefore = await busd.balanceOf(deployer.address)
+      const [, amountOutB] = await this.router.getAmountsOut(amountIn, path)
+      await this.router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        amountIn,
+        0,
+        path,
+        deployer.address,
+        (await ethers.provider.getBlock()).timestamp + 100
+      )
+      const prismaBalanceAfter = await prismaToken.balanceOf(deployer.address)
+      const busdBalanceAfter = await busd.balanceOf(deployer.address)
+      assert.equal(
+        BigInt(busdBalanceAfter) / BigInt(10 ** 18),
+        BigInt(busdBalanceBefore) / BigInt(10 ** 18) +
+          BigInt(amountOutB) / BigInt(10 ** 18)
+      )
+      assert.equal(
+        BigInt(prismaBalanceAfter) / BigInt(10 ** 18),
+        BigInt(prismaBalanceBefore) / BigInt(10 ** 18) -
+          BigInt(amountIn) / BigInt(10 ** 18)
+      )
+    })
+    it("normal transfers are not taxed", async () => {
       await prismaToken.transfer(user.address, ethers.utils.parseEther("10000"))
       const userBalance = await prismaToken.balanceOf(user.address)
       assert.equal(userBalance.toString(), ethers.utils.parseEther("10000"))
-    })
-    it("takes fees to", async () => {
-      await prismaToken.transfer(
-        market.address,
-        ethers.utils.parseEther("10000")
-      )
-      assert.equal(
-        (await prismaToken.balanceOf(liquidity.address)).toString(),
-        ethers.utils.parseEther("200")
-      )
-      assert.equal(
-        (await prismaToken.balanceOf(treasury.address)).toString(),
-        ethers.utils.parseEther("200")
-      )
-      assert.equal(
-        (await prismaToken.balanceOf(market.address)).toString(),
-        ethers.utils.parseEther("1009600")
-      )
-      assert.equal(
-        (await prismaToken.balanceOf(deployer.address)).toString(),
-        ethers.utils.parseEther("99990000")
-      )
-    })
-    it("takes fees from", async () => {
-      const prismaMarket = prismaToken.connect(market)
-      await prismaMarket.transfer(
-        deployer.address,
-        ethers.utils.parseEther("10000")
-      )
-      assert.equal(
-        (await prismaToken.balanceOf(liquidity.address)).toString(),
-        ethers.utils.parseEther("200")
-      )
-      assert.equal(
-        (await prismaToken.balanceOf(treasury.address)).toString(),
-        ethers.utils.parseEther("200")
-      )
-      assert.equal(
-        (await prismaToken.balanceOf(market.address)).toString(),
-        ethers.utils.parseEther("990000")
-      )
-      assert.equal(
-        (await prismaToken.balanceOf(deployer.address)).toString(),
-        ethers.utils.parseEther("100009600")
-      )
     })
     it("cannot sell staked balance", async () => {
       await prismaToken.transfer(user.address, ethers.utils.parseEther("10000"))
       const prismaUser = prismaToken.connect(user)
       await prismaUser.stakePrisma(ethers.utils.parseEther("5000"))
       await expect(
-        prismaUser.transfer(market.address, ethers.utils.parseEther("7500"))
+        prismaUser.transfer(
+          this.router.address,
+          ethers.utils.parseEther("7500")
+        )
       ).to.be.rejectedWith("You need to unstake first")
     })
     it("cannot transfer staked balance", async () => {
@@ -206,21 +195,19 @@ describe("PrismaV1 Test", () => {
   })
   describe("snapshot", () => {
     it("snapshot can be retrieved", async () => {
-      const prismaMultisig = prismaToken.connect(multisig)
       await prismaToken.transfer(
         multisig.address,
         ethers.utils.parseEther("50000000")
       )
+      const balanceBefore = await prismaToken.balanceOf(deployer.address)
+      const prismaMultisig = prismaToken.connect(multisig)
       await prismaMultisig.snapshot()
       await prismaToken.transfer(
         multisig.address,
         ethers.utils.parseEther("100000")
       )
-      const deployerBalance = await prismaToken.balanceOfAt(deployer.address, 1)
-      assert.equal(
-        deployerBalance.toString(),
-        ethers.utils.parseEther("50000000")
-      )
+      const balanceSnapshot = await prismaToken.balanceOfAt(deployer.address, 1)
+      assert.equal(balanceSnapshot.toString(), balanceBefore.toString())
     })
     it("only works for multisig", async () => {
       const prismaMultisig = prismaToken.connect(multisig)
@@ -343,18 +330,6 @@ describe("PrismaV1 Test", () => {
       )
     })
     it("can reinvest dividends", async () => {
-      await prismaToken.transfer(
-        prismaToken.address,
-        ethers.utils.parseEther("1000000")
-      )
-      await busd.transfer(
-        prismaToken.address,
-        ethers.utils.parseEther("1000000")
-      )
-      await prismaToken.addPrismaLiquidity(
-        ethers.utils.parseEther("1000000"),
-        ethers.utils.parseEther("1000000")
-      )
       await prismaToken.stakePrisma(ethers.utils.parseEther("1000000"))
       await prismaToken.setDividends(deployer.address, deployer.address)
       await prismaToken.processDividends()
@@ -367,8 +342,11 @@ describe("PrismaV1 Test", () => {
       const reinvestAmount = BigInt(
         (dividends * ((stakeBefore * 100) / prismaBalanceBefore)) / 100
       )
-      const [, amountOutB] = await prismaToken.getPrismaAmountsOut(
-        reinvestAmount
+      const path = [busd.address, prismaToken.address]
+      await busd.approve(this.router.address, reinvestAmount)
+      const [, amountOutB] = await this.router.getAmountsOut(
+        reinvestAmount,
+        path
       )
       await prismaToken.claim()
       const prismaBalanceAfter = await prismaToken.balanceOf(deployer.address)
