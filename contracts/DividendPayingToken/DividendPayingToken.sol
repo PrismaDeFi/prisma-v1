@@ -53,6 +53,8 @@ contract DividendPayingToken is
 
   uint256 public totalDividendsDistributed;
 
+  event DividendReinvested(address indexed to, uint256 weiAmount);
+
   constructor(
     string memory _name,
     string memory _symbol,
@@ -114,41 +116,33 @@ contract DividendPayingToken is
         withdrawnDividends[user] +
         _withdrawableDividend;
 
-      uint256 stakedAmount = prisma.getStakedPrisma(user);
-      if (stakedAmount > 0) {
-        uint256 prismaBalance = this.balanceOf(user);
-        uint256 reinvestAmount = (_withdrawableDividend *
-          ((stakedAmount * magnitude) / prismaBalance)) / magnitude;
-        IERC20(dividendToken).approve(address(uniswapV2Router), reinvestAmount);
-        address[] memory path = new address[](2);
-        path[0] = dividendToken;
-        path[1] = prismaToken;
-        uniswapV2Router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
-          reinvestAmount,
-          0,
-          path,
-          user,
-          block.timestamp
-        );
-        if (_withdrawableDividend - reinvestAmount > 0)
-          IERC20(dividendToken).transfer(
-            user,
-            _withdrawableDividend - reinvestAmount
-          );
-      } else {
+      uint256 _netWithdrawableDividend = reinvest(user, _withdrawableDividend);
+
+      if (_netWithdrawableDividend > 0) {
+        // either some amount is reinvested or nothing is reinvested
         bool success = IERC20(dividendToken).transfer(
           user,
-          _withdrawableDividend
+          _netWithdrawableDividend
         );
 
         if (!success) {
+          // if claim fails, we only dedcut the `_netWithdrawableDividend` amount in total `withdrawnDividends`. Because rest amount is already invested when we called `reinvest` function above.
           withdrawnDividends[user] =
             withdrawnDividends[user] -
-            _withdrawableDividend;
+            _netWithdrawableDividend;
           return 0;
         }
+        emit DividendReinvested(
+          user,
+          _withdrawableDividend - _netWithdrawableDividend
+        );
+        emit DividendWithdrawn(user, _netWithdrawableDividend);
+      } else {
+        // all amount is reinvested
+        emit DividendReinvested(user, _withdrawableDividend);
+        emit DividendWithdrawn(user, 0);
       }
-      emit DividendWithdrawn(user, _withdrawableDividend);
+
       return _withdrawableDividend;
     }
 
@@ -284,7 +278,29 @@ contract DividendPayingToken is
   /**
    * @dev This function should be called from the d-app
    */
-  function setCompoundPrisma() external {
-    compoundPrisma[msg.sender] = true;
+  function reinvest(
+    address _user,
+    uint256 _withdrawableDividend
+  ) internal returns (uint256) {
+    uint256 stakedPrisma = prisma.getStakedPrisma(_user);
+    uint256 reinvestAmount;
+    if (stakedPrisma > 0) {
+      uint256 prismaBalance = this.balanceOf(_user);
+      reinvestAmount =
+        (_withdrawableDividend * ((stakedPrisma * magnitude) / prismaBalance)) /
+        magnitude;
+      IERC20(dividendToken).approve(address(uniswapV2Router), reinvestAmount);
+      address[] memory path = new address[](2);
+      path[0] = dividendToken;
+      path[1] = prismaToken;
+      uniswapV2Router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        reinvestAmount,
+        0,
+        path,
+        _user,
+        block.timestamp
+      );
+    }
+    return _withdrawableDividend - reinvestAmount;
   }
 }
