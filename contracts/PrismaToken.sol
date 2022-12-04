@@ -4,8 +4,6 @@ pragma solidity 0.8.16;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20SnapshotUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
-import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import "./IPrismaDividendTracker.sol";
 import "./IPrismaToken.sol";
 
@@ -27,7 +25,6 @@ contract PrismaToken is
 
   IPrismaDividendTracker private prismaDividendTracker;
 
-  address public router;
   address public multisig;
   address public liquidityReceiver;
   address public treasuryReceiver;
@@ -51,10 +48,6 @@ contract PrismaToken is
   uint256 private _sellLiquidityFee;
   uint256 private _sellTreasuryFee;
   uint256 private _sellBurnFee;
-  uint256 private _totalBuyFees =
-    _buyLiquidityFee + _buyTreasuryFee + _buyBurnFee;
-  uint256 private _totalSellFees =
-    _sellLiquidityFee + _sellTreasuryFee + _sellBurnFee;
   uint256 private _minStakeAmount;
   uint256 private gasForProcessing = 300000;
 
@@ -94,7 +87,6 @@ contract PrismaToken is
    */
   function init(
     address _prismaDividendToken,
-    address _router,
     address _tracker
   ) public initializer {
     __Ownable_init();
@@ -112,12 +104,11 @@ contract PrismaToken is
     _minStakeAmount = 10 * (10 ** 18); //Need to discuss this number
     _stakingEnabled = true;
 
-    router = _router;
     prismaDividendToken = _prismaDividendToken;
     prismaDividendTracker = IPrismaDividendTracker(_tracker);
 
     _balances[msg.sender] = _totalSupply;
-    _automatedMarketMakerPairs[_router] = true;
+
     _isFeeExempt[multisig] = true;
     _isFeeExempt[_tracker] = true;
   }
@@ -414,9 +405,24 @@ contract PrismaToken is
     _notStakingQualified[user] = notQualified;
   }
 
+  function setAutomatedMarketPair(
+    address _pair,
+    bool _active
+  ) external onlyOwner {
+    _automatedMarketMakerPairs[_pair] = _active;
+  }
+
   ///////////////////////
   // Getter Functions //
   /////////////////////
+
+  function getTotalBuyFees() external view returns (uint256) {
+    return _buyLiquidityFee + _buyTreasuryFee + _buyBurnFee;
+  }
+
+  function getTotalSellFees() external view returns (uint256) {
+    return _sellLiquidityFee + _sellTreasuryFee + _sellBurnFee;
+  }
 
   function getBuyLiquidityFee() external view returns (uint256) {
     return _buyLiquidityFee;

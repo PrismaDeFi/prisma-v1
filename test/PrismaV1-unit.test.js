@@ -48,11 +48,7 @@ describe("PrismaV1 Test", () => {
     await this.router.deployTransaction.wait()
 
     prismaMultisig = prismaToken.connect(multisig)
-    await prismaMultisig.init(
-      busd.address,
-      this.router.address,
-      tracker.address
-    )
+    await prismaMultisig.init(busd.address, tracker.address)
     await prismaMultisig.transfer(
       deployer.address,
       ethers.utils.parseEther("100000000")
@@ -86,6 +82,8 @@ describe("PrismaV1 Test", () => {
       busd.address
     )
     this.pair = await ethers.getContractAt("IUniswapV2Pair", pairAddress)
+
+    await prismaToken.setAutomatedMarketPair(pairAddress, true)
   })
   describe("init", () => {
     it("initialized correctly", async () => {
@@ -104,7 +102,7 @@ describe("PrismaV1 Test", () => {
     })
     it("cannot be reinizialized", async () => {
       await expect(
-        prismaToken.init(busd.address, this.router.address, tracker.address)
+        prismaToken.init(busd.address, tracker.address)
       ).to.be.revertedWith("Initializable: contract is already initialized")
     })
     it("has liquidity", async () => {
@@ -130,10 +128,13 @@ describe("PrismaV1 Test", () => {
       )
       const prismaBalanceAfter = await prismaToken.balanceOf(deployer.address)
       const busdBalanceAfter = await busd.balanceOf(deployer.address)
+      const buyFee = await prismaToken.getTotalBuyFees()
+      const taxedAmountOut =
+        (BigInt(100 - buyFee) * BigInt(amountOutB)) / BigInt(100)
       assert.equal(
         BigInt(prismaBalanceAfter) / BigInt(10 ** 18),
         BigInt(prismaBalanceBefore) / BigInt(10 ** 18) +
-          BigInt(amountOutB) / BigInt(10 ** 18)
+          BigInt(taxedAmountOut) / BigInt(10 ** 18)
       )
       assert.equal(
         BigInt(busdBalanceAfter) / BigInt(10 ** 18),
@@ -147,7 +148,13 @@ describe("PrismaV1 Test", () => {
       await prismaToken.approve(this.router.address, amountIn)
       const prismaBalanceBefore = await prismaToken.balanceOf(deployer.address)
       const busdBalanceBefore = await busd.balanceOf(deployer.address)
-      const [, amountOutB] = await this.router.getAmountsOut(amountIn, path)
+      const sellFee = await prismaToken.getTotalSellFees()
+      const taxedAmountIn =
+        (BigInt(100 - sellFee) * BigInt(amountIn)) / BigInt(100)
+      const [, amountOutB] = await this.router.getAmountsOut(
+        taxedAmountIn,
+        path
+      )
       await this.router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
         amountIn,
         0,
