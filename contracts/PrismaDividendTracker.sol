@@ -141,12 +141,16 @@ contract PrismaDividendTracker is
 
   function _withdrawDividendOfUser(address user) internal returns (uint256) {
     uint256 _withdrawableDividend = withdrawableDividendOf(user);
+    uint256 _withdrawablePrisma = distributeEarnedPrisma(user);
 
     if (_withdrawableDividend > 0) {
       withdrawnDividends[user] =
         withdrawnDividends[user] +
         _withdrawableDividend;
 
+      if (_withdrawablePrisma > 0) {
+        prisma.transfer(user, _withdrawablePrisma);
+      }
       // uint256 _netWithdrawableDividend = reinvest(user, _withdrawableDividend);
 
       // if (_netWithdrawableDividend > 0) {

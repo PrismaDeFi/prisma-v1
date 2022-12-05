@@ -152,7 +152,7 @@ contract PrismaToken is
   function transfer(
     address to,
     uint256 amount
-  ) public virtual override returns (bool) {
+  ) public virtual override(ERC20Upgradeable, IPrismaToken) returns (bool) {
     address owner = _msgSender();
     _transferFrom(owner, to, amount);
     return true;
