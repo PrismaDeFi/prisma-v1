@@ -50,6 +50,7 @@ contract PrismaToken is
   uint256 private _sellBurnFee;
   uint256 private _minStakeAmount;
   uint256 private gasForProcessing = 300000;
+  uint256 private _totalStakedAmount;
 
   ////////////
   // Events //
@@ -332,6 +333,7 @@ contract PrismaToken is
     );
 
     _stakedPrisma[_user] += _amount;
+    _totalStakedAmount += _amount;
   }
 
   /**
@@ -356,6 +358,7 @@ contract PrismaToken is
     require(_stakedPrisma[_user] >= _amount, "Not enough tokens to unstake");
 
     _stakedPrisma[_user] -= _amount;
+    _totalStakedAmount -= _amount;
 
     if (_stakedPrisma[_user] == 0) {
       delete _stakedPrisma[_user];
@@ -458,6 +461,10 @@ contract PrismaToken is
 
   function getStakingStatus() external view returns (bool) {
     return _stakingEnabled;
+  }
+
+  function getTotalStakedAmount() external view returns (uint256) {
+    return _totalStakedAmount;
   }
 
   //////////////////////////

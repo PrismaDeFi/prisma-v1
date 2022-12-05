@@ -602,4 +602,51 @@ contract PrismaDividendTracker is
   function getTotalDividendsDistributed() external view returns (uint256) {
     return totalDividendsDistributed;
   }
+
+  /**
+   * @dev need to rename the function and check modifier
+   */
+  function reinvestV2() internal {
+    uint256 totalStakedPrisma = prisma.getTotalStakedAmount();
+    uint256 _totalUnclaimedDividend = IERC20Upgradeable(dividendToken)
+      .balanceOf(address(this));
+
+    uint256 _reinvestAmount;
+    if (totalStakedPrisma > 0) {
+      uint256 totalPrismaBalance = totalSupply();
+      _reinvestAmount =
+        (_totalUnclaimedDividend *
+          ((totalStakedPrisma * magnitude) / totalPrismaBalance)) /
+        magnitude;
+      IERC20Upgradeable(dividendToken).approve(
+        address(router),
+        _reinvestAmount
+      );
+      address[] memory path = new address[](2);
+      path[0] = dividendToken;
+      path[1] = address(prisma);
+      router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        _reinvestAmount,
+        0,
+        path,
+        address(this),
+        block.timestamp
+      );
+    }
+  }
+
+  function distributeEarnedPrisma(
+    address _user
+  ) internal view returns (uint256) {
+    uint256 _contractPrismaBalance = prisma.balanceOf(address(this));
+    uint256 _shareOfPrisma;
+    if (_contractPrismaBalance > 0) {
+      uint256 _userStakedPrisma = prisma.getStakedPrisma(_user);
+      uint256 _totalStakedPrisma = prisma.getTotalStakedAmount();
+      _shareOfPrisma =
+        _contractPrismaBalance *
+        (_userStakedPrisma / _totalStakedPrisma);
+    }
+    return _shareOfPrisma;
+  }
 }
