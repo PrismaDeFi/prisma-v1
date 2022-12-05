@@ -147,32 +147,32 @@ contract PrismaDividendTracker is
         withdrawnDividends[user] +
         _withdrawableDividend;
 
-      uint256 _netWithdrawableDividend = reinvest(user, _withdrawableDividend);
+      // uint256 _netWithdrawableDividend = reinvest(user, _withdrawableDividend);
 
-      if (_netWithdrawableDividend > 0) {
-        // either some amount is reinvested or nothing is reinvested
-        bool success = IERC20Upgradeable(dividendToken).transfer(
-          user,
-          _netWithdrawableDividend
-        );
+      // if (_netWithdrawableDividend > 0) {
+      // either some amount is reinvested or nothing is reinvested
+      bool success = IERC20Upgradeable(dividendToken).transfer(
+        user,
+        _withdrawableDividend
+      );
 
-        if (!success) {
-          // if claim fails, we only dedcut the `_netWithdrawableDividend` amount in total `withdrawnDividends`. Because rest amount is already invested when we called `reinvest` function above.
-          withdrawnDividends[user] =
-            withdrawnDividends[user] -
-            _netWithdrawableDividend;
-          return 0;
-        }
-        emit DividendReinvested(
-          user,
-          _withdrawableDividend - _netWithdrawableDividend
-        );
-        emit DividendWithdrawn(user, _netWithdrawableDividend);
-      } else {
-        // all amount is reinvested
-        emit DividendReinvested(user, _withdrawableDividend);
-        emit DividendWithdrawn(user, 0);
+      if (!success) {
+        // if claim fails, we only dedcut the `_netWithdrawableDividend` amount in total `withdrawnDividends`. Because rest amount is already invested when we called `reinvest` function above.
+        withdrawnDividends[user] =
+          withdrawnDividends[user] -
+          _withdrawableDividend;
+        return 0;
       }
+      // emit DividendReinvested(
+      //   user,
+      //   _withdrawableDividend - _netWithdrawableDividend
+      // );
+      emit DividendWithdrawn(user, _withdrawableDividend);
+      // } else {
+      //   // all amount is reinvested
+      //   emit DividendReinvested(user, _withdrawableDividend);
+      //   emit DividendWithdrawn(user, 0);
+      // }
 
       return _withdrawableDividend;
     }
@@ -236,31 +236,31 @@ contract PrismaDividendTracker is
   /**
    * @dev This function should be called from the d-app
    */
-  function reinvest(
-    address _user,
-    uint256 _withdrawableDividend
-  ) internal returns (uint256) {
-    uint256 stakedPrisma = prisma.getStakedPrisma(_user);
-    uint256 reinvestAmount;
-    if (stakedPrisma > 0) {
-      uint256 prismaBalance = this.balanceOf(_user);
-      reinvestAmount =
-        (_withdrawableDividend * ((stakedPrisma * magnitude) / prismaBalance)) /
-        magnitude;
-      IERC20Upgradeable(dividendToken).approve(address(router), reinvestAmount);
-      address[] memory path = new address[](2);
-      path[0] = dividendToken;
-      path[1] = address(prisma);
-      router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
-        reinvestAmount,
-        0,
-        path,
-        _user,
-        block.timestamp
-      );
-    }
-    return _withdrawableDividend - reinvestAmount;
-  }
+  // function reinvest(
+  //   address _user,
+  //   uint256 _withdrawableDividend
+  // ) internal returns (uint256) {
+  //   uint256 stakedPrisma = prisma.getStakedPrisma(_user);
+  //   uint256 reinvestAmount;
+  //   if (stakedPrisma > 0) {
+  //     uint256 prismaBalance = this.balanceOf(_user);
+  //     reinvestAmount =
+  //       (_withdrawableDividend * ((stakedPrisma * magnitude) / prismaBalance)) /
+  //       magnitude;
+  //     IERC20Upgradeable(dividendToken).approve(address(router), reinvestAmount);
+  //     address[] memory path = new address[](2);
+  //     path[0] = dividendToken;
+  //     path[1] = address(prisma);
+  //     router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+  //       reinvestAmount,
+  //       0,
+  //       path,
+  //       _user,
+  //       block.timestamp
+  //     );
+  //   }
+  //   return _withdrawableDividend - reinvestAmount;
+  // }
 
   /**
    * @notice Used to check if an account is ready to claim
@@ -627,7 +627,7 @@ contract PrismaDividendTracker is
   /**
    * @dev need to rename the function and check modifier
    */
-  function reinvestV2() internal {
+  function reinvestV2() public {
     uint256 totalStakedPrisma = prisma.getTotalStakedAmount();
     uint256 _totalUnclaimedDividend = IERC20Upgradeable(dividendToken)
       .balanceOf(address(this));
@@ -646,19 +646,23 @@ contract PrismaDividendTracker is
       address[] memory path = new address[](2);
       path[0] = dividendToken;
       path[1] = address(prisma);
-      router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+      router.swapExactTokensForTokens(
         _reinvestAmount,
         0,
         path,
         address(this),
         block.timestamp
       );
+
+      magnifiedDividendPerShare = (_reinvestAmount * magnitude) / totalSupply();
+
+      emit DividendsDistributed(msg.sender, _reinvestAmount);
+
+      totalDividendsDistributed = totalDividendsDistributed + _reinvestAmount;
     }
   }
 
-  function distributeEarnedPrisma(
-    address _user
-  ) internal view returns (uint256) {
+  function distributeEarnedPrisma(address _user) public view returns (uint256) {
     uint256 _contractPrismaBalance = prisma.balanceOf(address(this));
     uint256 _shareOfPrisma;
     if (_contractPrismaBalance > 0) {
