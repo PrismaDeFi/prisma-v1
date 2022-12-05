@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.16;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20SnapshotUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "./IPrismaDividendTracker.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20SnapshotUpgradeable.sol";
 import "./IPrismaToken.sol";
+import "./IPrismaDividendTracker.sol";
 
 contract PrismaToken is
   IPrismaToken,
@@ -132,7 +132,13 @@ contract PrismaToken is
    */
   function balanceOf(
     address account
-  ) public view virtual override returns (uint256) {
+  )
+    public
+    view
+    virtual
+    override(ERC20Upgradeable, IPrismaToken)
+    returns (uint256)
+  {
     return _balances[account];
   }
 
