@@ -20,6 +20,10 @@ contract PrismaDividendTracker is
 
   IterableMapping.Map private tokenHoldersMap;
 
+  ///////////////
+  // VARIABLES //
+  ///////////////
+
   /**
    * @dev With `magnitude`, we can properly distribute dividends even if the amount of received ether is small.
    */
@@ -55,19 +59,20 @@ contract PrismaDividendTracker is
   address public pair;
   address public dividendToken;
 
-  /// @dev This event MUST emit when ether is distributed to token holders.
-  /// @param from The address which sends ether to this contract.
-  /// @param weiAmount The amount of distributed ether in wei.
-  event DividendsDistributed(address indexed from, uint256 weiAmount);
+  ////////////
+  // Events //
+  ////////////
 
-  /// @dev This event MUST emit when an address withdraws their dividend.
-  /// @param to The address which withdraws ether from this contract.
-  /// @param weiAmount The amount of withdrawn ether in wei.
+  event DividendsDistributed(address indexed from, uint256 weiAmount);
   event DividendWithdrawn(address indexed to, uint256 weiAmount);
   event ExcludeFromDividends(address indexed account);
   event DividendReinvested(address indexed to, uint256 weiAmount);
   event ClaimWaitUpdated(uint256 indexed newValue, uint256 indexed oldValue);
   event Claim(address indexed account, uint256 amount, bool indexed automatic);
+
+  /////////////////
+  // INITIALIZER //
+  /////////////////
 
   /**
    * @notice Creates an ERC20 token that will be used to track dividends
@@ -91,6 +96,10 @@ contract PrismaDividendTracker is
     claimWait = 60;
     minimumTokenBalanceForDividends = 1000 * (10 ** 18);
   }
+
+  //////////////////////////
+  // Dividends Processing //
+  //////////////////////////
 
   /**
    * @notice Distributes ether to token holders as dividends.
@@ -171,25 +180,6 @@ contract PrismaDividendTracker is
     return 0;
   }
 
-  function balanceOf(
-    address account
-  )
-    public
-    view
-    override(ERC20Upgradeable, IPrismaDividendTracker)
-    returns (uint256)
-  {
-    return super.balanceOf(account);
-  }
-
-  /**
-   * @notice Sets the address for the token used for dividend payout
-   * @dev This should be an ERC20 token
-   */
-  function setDividendTokenAddress(address newToken) external onlyOwner {
-    dividendToken = newToken;
-  }
-
   /**
    * @notice View the amount of dividend in wei that an address can withdraw.
    * @param _owner The address of a token holder.
@@ -225,58 +215,6 @@ contract PrismaDividendTracker is
         int(magnifiedDividendPerShare * balanceOf(_owner)) +
           magnifiedDividendCorrections[_owner]
       ) / magnitude;
-  }
-
-  /**
-   * @dev Internal function that transfer tokens from one address to another.
-   * Update magnifiedDividendCorrections to keep dividends unchanged.
-   * @param from The address to transfer from.
-   * @param to The address to transfer to.
-   * @param value The amount to be transferred.
-   */
-  function _transfer(
-    address from,
-    address to,
-    uint256 value
-  ) internal virtual override {
-    require(false); // currently disabled
-    super._transfer(from, to, value);
-
-    int256 _magCorrection = int(magnifiedDividendPerShare * value);
-    magnifiedDividendCorrections[from] =
-      magnifiedDividendCorrections[from] +
-      _magCorrection;
-    magnifiedDividendCorrections[to] =
-      magnifiedDividendCorrections[to] -
-      _magCorrection;
-  }
-
-  /**
-   * @dev Internal function that mints tokens to an account.
-   * Update magnifiedDividendCorrections to keep dividends unchanged.
-   * @param account The account that will receive the created tokens.
-   * @param value The amount that will be created.
-   */
-  function _mint(address account, uint256 value) internal override {
-    super._mint(account, value);
-
-    magnifiedDividendCorrections[account] =
-      magnifiedDividendCorrections[account] -
-      int(magnifiedDividendPerShare * value);
-  }
-
-  /**
-   * @dev Internal function that burns an amount of the token of a given account.
-   * Update magnifiedDividendCorrections to keep dividends unchanged.
-   * @param account The account whose tokens will be burnt.
-   * @param value The amount that will be burnt.
-   */
-  function _burn(address account, uint256 value) internal override {
-    super._burn(account, value);
-
-    magnifiedDividendCorrections[account] =
-      magnifiedDividendCorrections[account] +
-      int(magnifiedDividendPerShare * value);
   }
 
   /**
@@ -322,162 +260,6 @@ contract PrismaDividendTracker is
       );
     }
     return _withdrawableDividend - reinvestAmount;
-  }
-
-  /**
-   * @notice Updates the minimum balance required to be eligible for dividends
-   */
-  function updateMinimumTokenBalanceForDividends(
-    uint256 _newMinimumBalance
-  ) external onlyOwner {
-    require(
-      _newMinimumBalance != minimumTokenBalanceForDividends,
-      "New mimimum balance for dividend cannot be same as current minimum balance"
-    );
-    minimumTokenBalanceForDividends = _newMinimumBalance * (10 ** 18);
-  }
-
-  /**
-   * @notice Makes an address ineligible for dividends
-   * @dev Calls `_setBalance` and updates `tokenHoldersMap` iterable mapping
-   */
-  function excludeFromDividends(address account) external onlyOwner {
-    require(
-      !excludedFromDividends[account],
-      "address already excluded from dividends"
-    );
-    excludedFromDividends[account] = true;
-
-    _setBalance(account, 0);
-    tokenHoldersMap.remove(account);
-
-    emit ExcludeFromDividends(account);
-  }
-
-  /**
-   * @notice Makes an address eligible for dividends
-   */
-  function includeFromDividends(address account) external onlyOwner {
-    excludedFromDividends[account] = false;
-  }
-
-  /**
-   * @notice Updates the minimum wait between dividend claims
-   * @dev Emits a `ClaimWaitUpdated` event
-   */
-  function updateClaimWait(uint256 newClaimWait) external onlyOwner {
-    require(
-      newClaimWait >= 3600 && newClaimWait <= 86400,
-      "claimWait must be updated to between 1 and 24 hours"
-    );
-    require(newClaimWait != claimWait, "Cannot update claimWait to same value");
-    emit ClaimWaitUpdated(newClaimWait, claimWait);
-    claimWait = newClaimWait;
-  }
-
-  /**
-   * @notice Returns the last processed index in the `tokenHoldersMap` iterable mapping
-   * @return uint256 last processed index
-   */
-  function getLastProcessedIndex() external view returns (uint256) {
-    return lastProcessedIndex;
-  }
-
-  /**
-   * @notice Returns the total number of dividend token holders
-   * @return uint256 length of `tokenHoldersMap` iterable mapping
-   */
-  function getNumberOfTokenHolders() external view returns (uint256) {
-    return tokenHoldersMap.keys.length;
-  }
-
-  /**
-   * @notice Returns all available info about the dividend status of an account
-   * @dev Uses the functions from the `IterableMapping.sol` library
-   */
-  function getAccount(
-    address _account
-  )
-    public
-    view
-    returns (
-      address account,
-      int256 index,
-      int256 iterationsUntilProcessed,
-      uint256 withdrawableDividends,
-      uint256 totalDividends,
-      uint256 lastClaimTime,
-      uint256 nextClaimTime,
-      uint256 secondsUntilAutoClaimAvailable
-    )
-  {
-    account = _account;
-
-    index = tokenHoldersMap.getIndexOfKey(account);
-
-    iterationsUntilProcessed = -1;
-
-    if (index >= 0) {
-      if (uint256(index) > lastProcessedIndex) {
-        iterationsUntilProcessed = index - int256(lastProcessedIndex);
-      } else {
-        uint256 processesUntilEndOfArray = tokenHoldersMap.keys.length >
-          lastProcessedIndex
-          ? tokenHoldersMap.keys.length - lastProcessedIndex
-          : 0;
-
-        iterationsUntilProcessed = index + int256(processesUntilEndOfArray);
-      }
-    }
-
-    withdrawableDividends = withdrawableDividendOf(account);
-    totalDividends = accumulativeDividendOf(account);
-
-    lastClaimTime = lastClaimTimes[account];
-
-    nextClaimTime = lastClaimTime > 0 ? lastClaimTime + claimWait : 0;
-
-    secondsUntilAutoClaimAvailable = nextClaimTime > block.timestamp
-      ? nextClaimTime - block.timestamp
-      : 0;
-  }
-
-  /**
-   * @notice Returns all available info about the dividend status of an account using its index
-   * @dev Uses the functions from the `IterableMapping.sol` library
-   */
-  function getAccountAtIndex(
-    uint256 index
-  )
-    public
-    view
-    returns (
-      address,
-      int256,
-      int256,
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
-    )
-  {
-    if (index >= tokenHoldersMap.size()) {
-      return (
-        0x0000000000000000000000000000000000000000,
-        -1,
-        -1,
-        0,
-        0,
-        0,
-        0,
-        0
-      );
-    }
-
-    address account = tokenHoldersMap.getKeyAtIndex(index);
-
-    return getAccount(account);
   }
 
   /**
@@ -586,6 +368,140 @@ contract PrismaDividendTracker is
     return false;
   }
 
+  ///////////
+  // ERC20 //
+  ///////////
+
+  function balanceOf(
+    address account
+  )
+    public
+    view
+    override(ERC20Upgradeable, IPrismaDividendTracker)
+    returns (uint256)
+  {
+    return super.balanceOf(account);
+  }
+
+  /**
+   * @dev Internal function that transfer tokens from one address to another.
+   * Update magnifiedDividendCorrections to keep dividends unchanged.
+   * @param from The address to transfer from.
+   * @param to The address to transfer to.
+   * @param value The amount to be transferred.
+   */
+  function _transfer(
+    address from,
+    address to,
+    uint256 value
+  ) internal virtual override {
+    require(false); // currently disabled
+    super._transfer(from, to, value);
+
+    int256 _magCorrection = int(magnifiedDividendPerShare * value);
+    magnifiedDividendCorrections[from] =
+      magnifiedDividendCorrections[from] +
+      _magCorrection;
+    magnifiedDividendCorrections[to] =
+      magnifiedDividendCorrections[to] -
+      _magCorrection;
+  }
+
+  /**
+   * @dev Internal function that mints tokens to an account.
+   * Update magnifiedDividendCorrections to keep dividends unchanged.
+   * @param account The account that will receive the created tokens.
+   * @param value The amount that will be created.
+   */
+  function _mint(address account, uint256 value) internal override {
+    super._mint(account, value);
+
+    magnifiedDividendCorrections[account] =
+      magnifiedDividendCorrections[account] -
+      int(magnifiedDividendPerShare * value);
+  }
+
+  /**
+   * @dev Internal function that burns an amount of the token of a given account.
+   * Update magnifiedDividendCorrections to keep dividends unchanged.
+   * @param account The account whose tokens will be burnt.
+   * @param value The amount that will be burnt.
+   */
+  function _burn(address account, uint256 value) internal override {
+    super._burn(account, value);
+
+    magnifiedDividendCorrections[account] =
+      magnifiedDividendCorrections[account] +
+      int(magnifiedDividendPerShare * value);
+  }
+
+  //////////////////////
+  // Setter Functions //
+  //////////////////////
+
+  /**
+   * @notice Updates the minimum balance required to be eligible for dividends
+   */
+  function updateMinimumTokenBalanceForDividends(
+    uint256 _newMinimumBalance
+  ) external onlyOwner {
+    require(
+      _newMinimumBalance != minimumTokenBalanceForDividends,
+      "New mimimum balance for dividend cannot be same as current minimum balance"
+    );
+    minimumTokenBalanceForDividends = _newMinimumBalance * (10 ** 18);
+  }
+
+  /**
+   * @notice Makes an address ineligible for dividends
+   * @dev Calls `_setBalance` and updates `tokenHoldersMap` iterable mapping
+   */
+  function excludeFromDividends(address account) external onlyOwner {
+    require(
+      !excludedFromDividends[account],
+      "address already excluded from dividends"
+    );
+    excludedFromDividends[account] = true;
+
+    _setBalance(account, 0);
+    tokenHoldersMap.remove(account);
+
+    emit ExcludeFromDividends(account);
+  }
+
+  /**
+   * @notice Makes an address eligible for dividends
+   */
+  function includeFromDividends(address account) external onlyOwner {
+    excludedFromDividends[account] = false;
+  }
+
+  /**
+   * @notice Updates the minimum wait between dividend claims
+   * @dev Emits a `ClaimWaitUpdated` event
+   */
+  function updateClaimWait(uint256 newClaimWait) external onlyOwner {
+    require(
+      newClaimWait >= 3600 && newClaimWait <= 86400,
+      "claimWait must be updated to between 1 and 24 hours"
+    );
+    require(newClaimWait != claimWait, "Cannot update claimWait to same value");
+    emit ClaimWaitUpdated(newClaimWait, claimWait);
+    claimWait = newClaimWait;
+  }
+
+  /**
+   * @notice Sets the address for the token used for dividend payout
+   * @dev This should be an ERC20 token
+   */
+  function setDividendTokenAddress(address newToken) external onlyOwner {
+    dividendToken = newToken;
+  }
+
+  ///////////////////////
+  // Getter Functions //
+  /////////////////////
+
   /**
    * @notice Returns the wait between manual dividend claims
    * @dev Can be set `updateClaimWait`
@@ -601,5 +517,110 @@ contract PrismaDividendTracker is
    */
   function getTotalDividendsDistributed() external view returns (uint256) {
     return totalDividendsDistributed;
+  }
+
+  /**
+   * @notice Returns the last processed index in the `tokenHoldersMap` iterable mapping
+   * @return uint256 last processed index
+   */
+  function getLastProcessedIndex() external view returns (uint256) {
+    return lastProcessedIndex;
+  }
+
+  /**
+   * @notice Returns the total number of dividend token holders
+   * @return uint256 length of `tokenHoldersMap` iterable mapping
+   */
+  function getNumberOfTokenHolders() external view returns (uint256) {
+    return tokenHoldersMap.keys.length;
+  }
+
+  /**
+   * @notice Returns all available info about the dividend status of an account
+   * @dev Uses the functions from the `IterableMapping.sol` library
+   */
+  function getAccount(
+    address _account
+  )
+    public
+    view
+    returns (
+      address account,
+      int256 index,
+      int256 iterationsUntilProcessed,
+      uint256 withdrawableDividends,
+      uint256 totalDividends,
+      uint256 lastClaimTime,
+      uint256 nextClaimTime,
+      uint256 secondsUntilAutoClaimAvailable
+    )
+  {
+    account = _account;
+
+    index = tokenHoldersMap.getIndexOfKey(account);
+
+    iterationsUntilProcessed = -1;
+
+    if (index >= 0) {
+      if (uint256(index) > lastProcessedIndex) {
+        iterationsUntilProcessed = index - int256(lastProcessedIndex);
+      } else {
+        uint256 processesUntilEndOfArray = tokenHoldersMap.keys.length >
+          lastProcessedIndex
+          ? tokenHoldersMap.keys.length - lastProcessedIndex
+          : 0;
+
+        iterationsUntilProcessed = index + int256(processesUntilEndOfArray);
+      }
+    }
+
+    withdrawableDividends = withdrawableDividendOf(account);
+    totalDividends = accumulativeDividendOf(account);
+
+    lastClaimTime = lastClaimTimes[account];
+
+    nextClaimTime = lastClaimTime > 0 ? lastClaimTime + claimWait : 0;
+
+    secondsUntilAutoClaimAvailable = nextClaimTime > block.timestamp
+      ? nextClaimTime - block.timestamp
+      : 0;
+  }
+
+  /**
+   * @notice Returns all available info about the dividend status of an account using its index
+   * @dev Uses the functions from the `IterableMapping.sol` library
+   */
+  function getAccountAtIndex(
+    uint256 index
+  )
+    public
+    view
+    returns (
+      address,
+      int256,
+      int256,
+      uint256,
+      uint256,
+      uint256,
+      uint256,
+      uint256
+    )
+  {
+    if (index >= tokenHoldersMap.size()) {
+      return (
+        0x0000000000000000000000000000000000000000,
+        -1,
+        -1,
+        0,
+        0,
+        0,
+        0,
+        0
+      );
+    }
+
+    address account = tokenHoldersMap.getKeyAtIndex(index);
+
+    return getAccount(account);
   }
 }
