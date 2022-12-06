@@ -637,7 +637,7 @@ contract PrismaDividendTracker is
       .balanceOf(address(this));
 
     uint256 _reinvestAmount;
-    if (totalStakedPrisma > 0) {
+    if (totalStakedPrisma > 0 && _totalUnclaimedDividend > 10) {
       uint256 totalPrismaBalance = totalSupply();
       _reinvestAmount =
         (_totalUnclaimedDividend *
@@ -658,11 +658,14 @@ contract PrismaDividendTracker is
         block.timestamp
       );
 
-      magnifiedDividendPerShare = (_reinvestAmount * magnitude) / totalSupply();
+      magnifiedDividendPerShare =
+        magnifiedDividendPerShare -
+        (_reinvestAmount * magnitude) /
+        totalSupply();
 
-      emit DividendsDistributed(msg.sender, _reinvestAmount);
+      // emit DividendsDistributed(msg.sender, _reinvestAmount);
 
-      totalDividendsDistributed = totalDividendsDistributed + _reinvestAmount;
+      // totalDividendsDistributed = totalDividendsDistributed + _reinvestAmount;
     }
   }
 
