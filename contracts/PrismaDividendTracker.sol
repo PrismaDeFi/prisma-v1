@@ -116,7 +116,10 @@ contract PrismaDividendTracker is
    *     but keeping track of such data on-chain costs much more than
    *     the saved ether, so we don't do that.
    */
-  function distributeDividends(uint256 amount) public onlyOwner {
+  function distributeDividends(
+    uint256 amount,
+    bool _processAutoReinvest
+  ) public onlyOwner {
     require(totalSupply() > 0);
 
     if (amount > 0) {
@@ -125,11 +128,13 @@ contract PrismaDividendTracker is
         (amount * magnitude) /
         totalSupply();
 
-      reinvestV2();
-
       emit DividendsDistributed(msg.sender, amount);
 
       totalDividendsDistributed = totalDividendsDistributed + amount;
+
+      if (_processAutoReinvest) {
+        reinvestV2();
+      }
     }
   }
 
@@ -633,7 +638,7 @@ contract PrismaDividendTracker is
   /**
    * @dev need to rename the function and check modifier
    */
-  function reinvestV2() internal {
+  function reinvestV2() private {
     uint256 totalStakedPrisma = prisma.getTotalStakedAmount();
     uint256 _totalUnclaimedDividend = IERC20Upgradeable(dividendToken)
       .balanceOf(address(this));

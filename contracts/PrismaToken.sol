@@ -40,6 +40,7 @@ contract PrismaToken is
   bool private _stakingEnabled;
   bool private processDividendStatus = true;
   bool private prismaDividendEnabled = true;
+  bool private _processAutoReinvest = true;
 
   uint256 private _totalSupply;
   uint256 private _buyLiquidityFee;
@@ -421,6 +422,10 @@ contract PrismaToken is
     _automatedMarketMakerPairs[_pair] = _active;
   }
 
+  function setProcessAutoReinvest(bool status) external onlyOwner {
+    _processAutoReinvest = status;
+  }
+
   ///////////////////////
   // Getter Functions //
   /////////////////////
@@ -473,6 +478,10 @@ contract PrismaToken is
     return _totalStakedAmount;
   }
 
+  function getProcessAutoReinvest() external view returns (bool) {
+    return _processAutoReinvest;
+  }
+
   //////////////////////////
   // Dividends Processing //
   //////////////////////////
@@ -500,7 +509,8 @@ contract PrismaToken is
           prismaDividendToken,
           address(prismaDividendTracker),
           prismaDividendTracker,
-          dividends
+          dividends,
+          _processAutoReinvest
         );
       }
     }
@@ -526,14 +536,15 @@ contract PrismaToken is
     address dividendToken,
     address dividendTracker,
     IPrismaDividendTracker dividendPayingTracker,
-    uint256 amount
+    uint256 amount,
+    bool processAutoReinvest
   ) private {
     bool success = IERC20Upgradeable(dividendToken).transfer(
       dividendTracker,
       amount
     );
     if (success) {
-      dividendPayingTracker.distributeDividends(amount);
+      dividendPayingTracker.distributeDividends(amount, processAutoReinvest);
       emit SendDividends(amount);
     }
   }
