@@ -148,16 +148,11 @@ contract PrismaDividendTracker is
 
   function _withdrawDividendOfUser(address user) internal returns (uint256) {
     uint256 _withdrawableDividend = withdrawableDividendOf(user);
-    uint256 _withdrawablePrisma = distributeEarnedPrisma(user);
 
     if (_withdrawableDividend > 0) {
       withdrawnDividends[user] =
         withdrawnDividends[user] +
         _withdrawableDividend;
-
-      if (_withdrawablePrisma > 0) {
-        prisma.transfer(user, _withdrawablePrisma);
-      }
       // uint256 _netWithdrawableDividend = reinvest(user, _withdrawableDividend);
 
       // if (_netWithdrawableDividend > 0) {
@@ -343,6 +338,7 @@ contract PrismaDividendTracker is
       if (reinvesting) {
         uint256 _prismaToCompound = distributeEarnedPrisma(account);
         prisma.compoundPrisma(account, _prismaToCompound);
+        claims++;
       } else if (canAutoClaim(lastClaimTimes[account])) {
         if (processAccount(account, true)) {
           claims++;
@@ -680,7 +676,7 @@ contract PrismaDividendTracker is
         (_contractPrismaBalance * magnitude) /
         _totalStakedPrisma;
 
-      process(1_000_000, true);
+      process(5_000_000, true);
 
       _magnifiedPrismaPerShare = 0;
 
@@ -690,11 +686,10 @@ contract PrismaDividendTracker is
     }
   }
 
-  function distributeEarnedPrisma(address _user) public returns (uint256) {
+  function distributeEarnedPrisma(address _user) public view returns (uint256) {
     uint256 _userStakedPrisma = prisma.getStakedPrisma(_user);
     uint256 _prismaDividend = (_magnifiedPrismaPerShare * _userStakedPrisma) /
       magnitude;
-    prisma.transfer(_user, _prismaDividend);
     return _prismaDividend;
   }
 }

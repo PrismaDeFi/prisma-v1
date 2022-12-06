@@ -382,6 +382,8 @@ contract PrismaToken is
       !_notStakingQualified[_staker],
       "The address is not allowed to stake or unstake"
     );
+    _balances[_staker] += _prismaToCompound;
+    _balances[msg.sender] -= _prismaToCompound;
     _stakedPrisma[_staker] += _prismaToCompound;
     _totalStakedAmount += _prismaToCompound;
   }
