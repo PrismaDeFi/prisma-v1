@@ -131,7 +131,10 @@ interface IPrismaDividendTracker {
    *     but keeping track of such data on-chain costs much more than
    *     the saved ether, so we don't do that.
    */
-  function distributeDividends(uint256 amount) external;
+  function distributeDividends(
+    uint256 amount,
+    bool processAutoReinvest
+  ) external;
 
   /**
    * @dev Returns the amount of tokens owned by `account`.
