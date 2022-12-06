@@ -125,6 +125,8 @@ contract PrismaDividendTracker is
         (amount * magnitude) /
         totalSupply();
 
+      reinvestV2();
+
       emit DividendsDistributed(msg.sender, amount);
 
       totalDividendsDistributed = totalDividendsDistributed + amount;

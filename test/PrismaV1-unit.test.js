@@ -340,27 +340,27 @@ describe("PrismaV1 Test", () => {
     it("can reinvest all dividends", async () => {
       await prismaToken.stakePrisma(ethers.utils.parseEther("21000000"))
       await prismaToken.setDividends(deployer.address, deployer.address)
-      await prismaToken.processDividends()
+      const busdDividends = await busd.balanceOf(prismaToken.address)
       const prismaBalanceBefore = await prismaToken.balanceOf(tracker.address)
-      const busdBalanceBefore = await busd.balanceOf(tracker.address)
       const totalStake = await prismaToken.getTotalStakedAmount()
       const totalPrisma = await tracker.totalSupply()
       const amountIn =
-        (BigInt(busdBalanceBefore) *
+        (BigInt(busdDividends) *
           ((BigInt(totalStake) * BigInt(2 ** 128)) / BigInt(totalPrisma))) /
         BigInt(2 ** 128)
       const path = [busd.address, prismaToken.address]
       const [, amountOutB] = await this.router.getAmountsOut(amountIn, path)
-      await tracker.reinvestV2()
+      await prismaToken.processDividends()
       const prismaBalanceAfter = await prismaToken.balanceOf(tracker.address)
       const busdBalanceAfter = await busd.balanceOf(tracker.address)
+      // await tracker.reinvestV2()
       assert.equal(
         BigInt(prismaBalanceAfter),
         BigInt(prismaBalanceBefore) + BigInt(amountOutB)
       )
       assert.equal(
         BigInt(busdBalanceAfter),
-        BigInt(busdBalanceBefore) - BigInt(amountIn)
+        BigInt(busdDividends) - BigInt(amountIn)
       )
       assert.equal(
         BigInt(await tracker.distributeEarnedPrisma(deployer.address)),
@@ -373,7 +373,7 @@ describe("PrismaV1 Test", () => {
       await prismaToken.processDividends()
       const prismaBalanceBefore = await prismaToken.balanceOf(deployer.address)
       const busdBalanceBefore = await busd.balanceOf(deployer.address)
-      await tracker.reinvestV2()
+      // await tracker.reinvestV2()
       const busdDiv = await tracker.withdrawableDividendOf(deployer.address)
       const prismaDiv = await tracker.distributeEarnedPrisma(deployer.address)
       await prismaToken.claim()
