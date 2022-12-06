@@ -353,7 +353,6 @@ describe("PrismaV1 Test", () => {
       await prismaToken.processDividends()
       const prismaBalanceAfter = await prismaToken.balanceOf(tracker.address)
       const busdBalanceAfter = await busd.balanceOf(tracker.address)
-      // await tracker.reinvestV2()
       assert.equal(
         BigInt(prismaBalanceAfter),
         BigInt(prismaBalanceBefore) + BigInt(amountOutB)
