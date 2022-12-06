@@ -371,6 +371,20 @@ contract PrismaToken is
     }
   }
 
+  function compoundPrisma(
+    address _staker,
+    uint256 _prismaToCompound
+  ) external override {
+    require(msg.sender == address(prismaDividendTracker), "NOT PRISMA_TRACKER");
+    require(_stakingEnabled, "Staking is paused");
+    require(
+      !_notStakingQualified[_staker],
+      "The address is not allowed to stake or unstake"
+    );
+    _stakedPrisma[_staker] += _prismaToCompound;
+    _totalStakedAmount += _prismaToCompound;
+  }
+
   ///////////////////////
   // Setter Functions //
   /////////////////////
@@ -506,12 +520,15 @@ contract PrismaToken is
     }
   }
 
-  function processDividendTracker(uint256 gas) public onlyOwner {
+  function processDividendTracker(
+    uint256 gas,
+    bool reinvesting
+  ) public onlyOwner {
     (
       uint256 Iterations,
       uint256 Claims,
       uint256 LastProcessedIndex
-    ) = prismaDividendTracker.process(gas);
+    ) = prismaDividendTracker.process(gas, reinvesting);
     emit PrismaDividendTracker_Processed(
       Iterations,
       Claims,
@@ -604,7 +621,7 @@ contract PrismaToken is
     address _newContract,
     uint256 gas
   ) external onlyOwner {
-    prismaDividendTracker.process(gas);
+    prismaDividendTracker.process(gas, false);
     prismaDividendToken = _newContract;
     prismaDividendTracker.setDividendTokenAddress(_newContract);
   }

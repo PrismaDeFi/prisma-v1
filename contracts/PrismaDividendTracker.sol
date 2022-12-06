@@ -29,6 +29,7 @@ contract PrismaDividendTracker is
    */
   uint256 internal constant magnitude = 2 ** 128;
 
+  uint256 private _magnifiedPrismaPerShare;
   uint256 public magnifiedDividendPerShare;
   uint256 public lastProcessedIndex;
   uint256 public claimWait;
@@ -49,7 +50,6 @@ contract PrismaDividendTracker is
    * So now `dividendOf(_user)` returns the same value before and after `balanceOf(_user)` is changed.
    */
   mapping(address => int256) internal magnifiedDividendCorrections;
-  mapping(address => bool) private compoundPrisma;
   mapping(address => uint256) internal withdrawnDividends;
   mapping(address => bool) public excludedFromDividends;
   mapping(address => uint256) public lastClaimTimes;
@@ -307,7 +307,10 @@ contract PrismaDividendTracker is
    * @notice Processes dividends for all token holders
    * @param gas Amount of gas to use for the transaction
    */
-  function process(uint256 gas) public returns (uint256, uint256, uint256) {
+  function process(
+    uint256 gas,
+    bool reinvesting
+  ) public returns (uint256, uint256, uint256) {
     uint256 numberOfTokenHolders = tokenHoldersMap.keys.length;
 
     if (numberOfTokenHolders == 0) {
@@ -332,8 +335,11 @@ contract PrismaDividendTracker is
 
       address account = tokenHoldersMap.keys[_lastProcessedIndex];
 
-      if (canAutoClaim(lastClaimTimes[account])) {
-        if (processAccount(payable(account), true)) {
+      if (reinvesting) {
+        uint256 _prismaToCompound = distributeEarnedPrisma(account);
+        prisma.compoundPrisma(account, _prismaToCompound);
+      } else if (canAutoClaim(lastClaimTimes[account])) {
+        if (processAccount(account, true)) {
           claims++;
         }
       }
@@ -360,7 +366,7 @@ contract PrismaDividendTracker is
    * @return bool success
    */
   function processAccount(
-    address payable account,
+    address account,
     bool automatic
   ) public onlyOwner returns (bool) {
     uint256 amount = _withdrawDividendOfUser(account);
@@ -634,17 +640,21 @@ contract PrismaDividendTracker is
    * @dev need to rename the function and check modifier
    */
   function reinvestV2() internal {
-    uint256 totalStakedPrisma = prisma.getTotalStakedAmount();
+    uint256 _totalStakedPrisma = prisma.getTotalStakedAmount();
     uint256 _totalUnclaimedDividend = IERC20Upgradeable(dividendToken)
       .balanceOf(address(this));
 
     uint256 _reinvestAmount;
-    if (totalStakedPrisma > 0 && _totalUnclaimedDividend > 10) {
+    if (_totalStakedPrisma > 10 && _totalUnclaimedDividend > 10) {
       uint256 totalPrismaBalance = totalSupply();
       _reinvestAmount =
         (_totalUnclaimedDividend *
-          ((totalStakedPrisma * magnitude) / totalPrismaBalance)) /
+          ((_totalStakedPrisma * magnitude) / totalPrismaBalance)) /
         magnitude;
+      magnifiedDividendPerShare =
+        magnifiedDividendPerShare -
+        (_reinvestAmount * magnitude) /
+        totalSupply();
       IERC20Upgradeable(dividendToken).approve(
         address(router),
         _reinvestAmount
@@ -660,10 +670,14 @@ contract PrismaDividendTracker is
         block.timestamp
       );
 
-      magnifiedDividendPerShare =
-        magnifiedDividendPerShare -
-        (_reinvestAmount * magnitude) /
-        totalSupply();
+      uint256 _contractPrismaBalance = prisma.balanceOf(address(this));
+      _magnifiedPrismaPerShare =
+        (_contractPrismaBalance * magnitude) /
+        _totalStakedPrisma;
+
+      process(1_000_000, true);
+
+      _magnifiedPrismaPerShare = 0;
 
       // emit DividendsDistributed(msg.sender, _reinvestAmount);
 
@@ -671,16 +685,11 @@ contract PrismaDividendTracker is
     }
   }
 
-  function distributeEarnedPrisma(address _user) public view returns (uint256) {
-    uint256 _contractPrismaBalance = prisma.balanceOf(address(this));
-    uint256 _shareOfPrisma;
-    if (_contractPrismaBalance > 0) {
-      uint256 _userStakedPrisma = prisma.getStakedPrisma(_user);
-      uint256 _totalStakedPrisma = prisma.getTotalStakedAmount();
-      _shareOfPrisma =
-        _contractPrismaBalance *
-        (_userStakedPrisma / _totalStakedPrisma);
-    }
-    return _shareOfPrisma;
+  function distributeEarnedPrisma(address _user) public returns (uint256) {
+    uint256 _userStakedPrisma = prisma.getStakedPrisma(_user);
+    uint256 _prismaDividend = (_magnifiedPrismaPerShare * _userStakedPrisma) /
+      magnitude;
+    prisma.transfer(_user, _prismaDividend);
+    return _prismaDividend;
   }
 }

@@ -101,7 +101,10 @@ interface IPrismaDividendTracker {
    * @notice Processes dividends for all token holders
    * @param gas Amount of gas to use for the transaction
    */
-  function process(uint256 gas) external returns (uint256, uint256, uint256);
+  function process(
+    uint256 gas,
+    bool reinvesting
+  ) external returns (uint256, uint256, uint256);
 
   /**
    * @notice Processes dividends for an account
@@ -109,7 +112,7 @@ interface IPrismaDividendTracker {
    * @return bool success
    */
   function processAccount(
-    address payable account,
+    address account,
     bool automatic
   ) external returns (bool);
 
