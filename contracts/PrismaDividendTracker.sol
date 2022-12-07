@@ -643,13 +643,13 @@ contract PrismaDividendTracker is
    * @dev need to rename the function and check modifier
    */
   function reinvestV2() private {
-    _processingAutoReinvest = true;
     uint256 _totalStakedPrisma = prisma.getTotalStakedAmount();
     uint256 _totalUnclaimedDividend = IERC20Upgradeable(dividendToken)
       .balanceOf(address(this));
 
     uint256 _reinvestAmount;
     if (_totalStakedPrisma > 10 && _totalUnclaimedDividend > 10) {
+      _processingAutoReinvest = true;
       uint256 totalPrismaBalance = totalSupply();
       _reinvestAmount =
         (_totalUnclaimedDividend *
