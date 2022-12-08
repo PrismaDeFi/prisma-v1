@@ -196,7 +196,9 @@ contract PrismaDividendTracker is
   function withdrawableDividendOf(
     address _owner
   ) public view returns (uint256) {
-    return accumulativeDividendOf(_owner) - withdrawnDividends[_owner];
+    return
+      (accumulativeDividendOf(_owner) - stakedDividendOf(_owner)) -
+      withdrawnDividends[_owner];
   }
 
   /**
@@ -206,6 +208,11 @@ contract PrismaDividendTracker is
    */
   function withdrawnDividendOf(address _owner) public view returns (uint256) {
     return withdrawnDividends[_owner];
+  }
+
+  function stakedDividendOf(address _owner) public view returns (uint256) {
+    return
+      (magnifiedDividendPerShare * prisma.getStakedPrisma(_owner)) / magnitude;
   }
 
   /**
