@@ -656,7 +656,6 @@ contract PrismaDividendTracker is
 
     uint256 _reinvestAmount;
     if (_totalStakedPrisma > 10 && _totalUnclaimedDividend > 10) {
-      _processingAutoReinvest = true;
       uint256 totalPrismaBalance = totalSupply();
       _reinvestAmount =
         (_totalUnclaimedDividend *
@@ -690,10 +689,6 @@ contract PrismaDividendTracker is
 
       _magnifiedPrismaPerShare = 0;
 
-      _unProcessedPrismaBalance = prisma.balanceOf(address(this));
-
-      _processingAutoReinvest = false;
-
       // emit DividendsDistributed(msg.sender, _reinvestAmount);
 
       // totalDividendsDistributed = totalDividendsDistributed + _reinvestAmount;
@@ -711,33 +706,39 @@ contract PrismaDividendTracker is
    * @dev perform manual reinvestment
    */
   function manualReinvest() external {
-    require(
-      !_processingAutoReinvest,
-      "Not allowed for now, try after sometime!"
-    );
-    uint256 _withdrawableDividend = withdrawableDividendOf(msg.sender);
-    if (_withdrawableDividend > 0) {
+    uint256 _userStakedPrisma = prisma.getStakedPrisma(msg.sender);
+    uint256 _userTotalPrisma = prisma.balanceOf(msg.sender);
+    uint256 _userDividend = withdrawableDividendOf(msg.sender);
+    uint256 _reinvestAmount = (_userDividend *
+      ((_userStakedPrisma * magnitude) / _userTotalPrisma)) / magnitude;
+
+    if (_reinvestAmount > 0) {
+      uint256 balanceBefore = prisma.balanceOf(address(this));
+
       IERC20Upgradeable(dividendToken).approve(
         address(router),
-        _withdrawableDividend
+        _reinvestAmount
       );
       address[] memory path = new address[](2);
       path[0] = dividendToken;
       path[1] = address(prisma);
       router.swapExactTokensForTokens(
-        _withdrawableDividend,
+        _reinvestAmount,
         0,
         path,
         address(this),
         block.timestamp
       );
-      uint256 _userPrismaBalance = prisma.balanceOf(address(this)) -
-        _unProcessedPrismaBalance;
-      bool success = prisma.transfer(msg.sender, _userPrismaBalance);
-      if (!success) {
-        require(false, "Manual reinvestment failed");
-        //we can add event to catch failed manual reinvest
-      }
+
+      uint256 balanceAfter = prisma.balanceOf(address(this));
+
+      uint256 _userPrisma = balanceAfter - balanceBefore;
+
+      magnifiedDividendCorrections[msg.sender] =
+        magnifiedDividendCorrections[msg.sender] -
+        int(_reinvestAmount * magnitude);
+
+      prisma.compoundPrisma(msg.sender, _userPrisma);
     }
   }
 }

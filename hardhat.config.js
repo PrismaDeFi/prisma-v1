@@ -36,7 +36,7 @@ module.exports = {
     apiKey: BSCSCAN_API_KEY,
   },
   gasReporter: {
-    enabled: true,
+    enabled: false,
     token: "BNB",
     currency: "USD",
     outputFile: "gas-report.txt",

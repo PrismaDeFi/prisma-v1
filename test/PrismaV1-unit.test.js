@@ -375,6 +375,50 @@ describe("PrismaV1 Test", () => {
       )
     })
   })
+  describe("manualReinvest", () => {
+    it("processes reinvestment manually", async () => {
+      await prismaToken.setDividends(deployer.address, deployer.address)
+      await prismaToken.processDividends()
+      await prismaToken.stakePrisma(ethers.utils.parseEther("21000000"))
+      const balanceBefore = await prismaToken.balanceOf(deployer.address)
+      const stakedBefore = await prismaToken.getStakedPrisma(deployer.address)
+      const dividendsBefore = await prismaToken.withdrawablePrismaDividendOf(
+        deployer.address
+      )
+      const stakedDividendBefore = await tracker.stakedDividendOf(
+        deployer.address
+      )
+      const amountIn =
+        (BigInt(dividendsBefore) *
+          ((BigInt(stakedBefore) * BigInt(2 ** 128)) / BigInt(balanceBefore))) /
+        BigInt(2 ** 128)
+      const path = [busd.address, prismaToken.address]
+      const [, amountOutB] = await this.router.getAmountsOut(amountIn, path)
+      await tracker.manualReinvest()
+      const balanceAfter = await prismaToken.balanceOf(deployer.address)
+      const stakedAfter = await prismaToken.getStakedPrisma(deployer.address)
+      const dividendsAfter = await prismaToken.withdrawablePrismaDividendOf(
+        deployer.address
+      )
+      const stakedDividendAfter = await tracker.stakedDividendOf(
+        deployer.address
+      )
+      assert.equal(
+        BigInt(balanceAfter),
+        BigInt(balanceBefore) + BigInt(amountOutB)
+      )
+      assert.equal(
+        BigInt(stakedAfter),
+        BigInt(stakedBefore) + BigInt(amountOutB)
+      )
+      assert.equal(
+        BigInt(dividendsAfter),
+        BigInt(dividendsBefore) -
+          BigInt(amountIn) -
+          (BigInt(stakedDividendAfter) - BigInt(stakedDividendBefore))
+      )
+    })
+  })
   describe("processDividendTracker", () => {
     it("processes dividends automatically", async () => {
       await prismaToken.setDividends(deployer.address, deployer.address)
