@@ -201,32 +201,6 @@ describe("PrismaV1 Test", () => {
       ).to.be.rejectedWith("You need to unstake first")
     })
   })
-  describe("snapshot", () => {
-    it("snapshot can be retrieved", async () => {
-      await prismaToken.transfer(
-        multisig.address,
-        ethers.utils.parseEther("50000000")
-      )
-      const balanceBefore = await prismaToken.balanceOf(deployer.address)
-      const prismaMultisig = prismaToken.connect(multisig)
-      await prismaMultisig.snapshot()
-      await prismaToken.transfer(
-        multisig.address,
-        ethers.utils.parseEther("100000")
-      )
-      const balanceSnapshot = await prismaToken.balanceOfAt(deployer.address, 1)
-      assert.equal(balanceSnapshot.toString(), balanceBefore.toString())
-    })
-    it("only works for multisig", async () => {
-      const prismaMultisig = prismaToken.connect(multisig)
-      const txResponse = await prismaMultisig.snapshot()
-      const txReceipt = await txResponse.wait()
-      await expect(prismaToken.snapshot()).to.be.revertedWith(
-        "Only multisig can trigger snapshot"
-      )
-      assert.equal(txReceipt.events[0].event, "Snapshot")
-    })
-  })
   describe("stakePrisma", () => {
     it("staking must be enabled", async () => {
       await prismaToken.setStakingStatus(false)
@@ -385,9 +359,6 @@ describe("PrismaV1 Test", () => {
       const dividendsBefore = await prismaToken.withdrawablePrismaDividendOf(
         deployer.address
       )
-      const stakedDividendBefore = await tracker.stakedDividendOf(
-        deployer.address
-      )
       const amountIn =
         (BigInt(dividendsBefore) *
           ((BigInt(stakedBefore) * BigInt(2 ** 128)) / BigInt(balanceBefore))) /
@@ -400,9 +371,6 @@ describe("PrismaV1 Test", () => {
       const dividendsAfter = await prismaToken.withdrawablePrismaDividendOf(
         deployer.address
       )
-      const stakedDividendAfter = await tracker.stakedDividendOf(
-        deployer.address
-      )
       assert.equal(
         BigInt(balanceAfter),
         BigInt(balanceBefore) + BigInt(amountOutB)
@@ -410,12 +378,6 @@ describe("PrismaV1 Test", () => {
       assert.equal(
         BigInt(stakedAfter),
         BigInt(stakedBefore) + BigInt(amountOutB)
-      )
-      assert.equal(
-        BigInt(dividendsAfter),
-        BigInt(dividendsBefore) -
-          BigInt(amountIn) -
-          (BigInt(stakedDividendAfter) - BigInt(stakedDividendBefore))
       )
     })
   })

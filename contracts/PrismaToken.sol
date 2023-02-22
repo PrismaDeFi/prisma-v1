@@ -3,15 +3,11 @@
 pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC20SnapshotUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "./IPrismaToken.sol";
 import "./IPrismaDividendTracker.sol";
 
-contract PrismaToken is
-  IPrismaToken,
-  ERC20SnapshotUpgradeable,
-  OwnableUpgradeable
-{
+contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   ///////////////
   // CONSTANTS //
   ///////////////
@@ -92,7 +88,6 @@ contract PrismaToken is
     address _tracker
   ) public initializer {
     __Ownable_init();
-    __ERC20Snapshot_init();
     __ERC20_init("Prisma Finance", "PRISMA");
 
     liquidityReceiver = 0x90F79bf6EB2c4f870365E785982E1f101E93b906; // development wallet
@@ -103,7 +98,7 @@ contract PrismaToken is
     _buyTreasuryFee = 2;
     _sellLiquidityFee = 2;
     _sellTreasuryFee = 2;
-    _minStakeAmount = 10 * (10 ** 18); //Need to discuss this number
+    _minStakeAmount = 10 * (10 ** 18); // Need to discuss this number
     _stakingEnabled = true;
 
     prismaDividendToken = _prismaDividendToken;
@@ -242,17 +237,17 @@ contract PrismaToken is
       if (_buyLiquidityFee > 0) {
         uint256 liquityFee = (amount * _buyLiquidityFee) / 100;
         fee += liquityFee;
-        _balances[liquidityReceiver] = liquityFee;
+        _balances[liquidityReceiver] += liquityFee;
       }
       if (_buyTreasuryFee > 0) {
         uint256 treasuryFee = (amount * _buyTreasuryFee) / 100;
         fee += treasuryFee;
-        _balances[treasuryReceiver] = treasuryFee;
+        _balances[treasuryReceiver] += treasuryFee;
       }
       if (_buyBurnFee > 0) {
         uint256 burnFee = (amount * _buyBurnFee) / 100;
         fee += burnFee;
-        _balances[DEAD] = burnFee;
+        _balances[DEAD] += burnFee;
         //Or we can burn directly from supply, comment above and uncomment below
         //_totalSupply -= burnFee;
       }
@@ -268,17 +263,17 @@ contract PrismaToken is
         if (_sellLiquidityFee > 0) {
           uint256 liquityFee = (amount * _sellLiquidityFee) / 100;
           fee += liquityFee;
-          _balances[liquidityReceiver] = liquityFee;
+          _balances[liquidityReceiver] += liquityFee;
         }
         if (_sellTreasuryFee > 0) {
           uint256 treasuryFee = (amount * _sellTreasuryFee) / 100;
           fee += treasuryFee;
-          _balances[treasuryReceiver] = treasuryFee;
+          _balances[treasuryReceiver] += treasuryFee;
         }
         if (_sellBurnFee > 0) {
           uint256 burnFee = (amount * _sellBurnFee) / 100;
           fee += burnFee;
-          _balances[DEAD] = burnFee;
+          _balances[DEAD] += burnFee;
           //Or we can burn directly from supply, comment above and uncomment below
           //_totalSupply -= burnFee;
         }
@@ -291,8 +286,6 @@ contract PrismaToken is
       }
     }
 
-    _beforeTokenTransfer(from, to, amount);
-
     uint256 amountReceived = amount - fee;
     unchecked {
       _balances[from] = fromBalance - amount; // from will deduct full amount not the amountReceived
@@ -302,11 +295,6 @@ contract PrismaToken is
     }
 
     emit Transfer(from, to, amountReceived);
-  }
-
-  function snapshot() external {
-    require(msg.sender == multisig, "Only multisig can trigger snapshot");
-    _snapshot();
   }
 
   //////////////
@@ -523,12 +511,27 @@ contract PrismaToken is
         );
         transferDividends(
           prismaDividendToken,
-          address(prismaDividendTracker),
           prismaDividendTracker,
           dividends,
           _processAutoReinvest
         );
       }
+    }
+  }
+
+  function transferDividends(
+    address dividendToken,
+    IPrismaDividendTracker dividendPayingTracker,
+    uint256 amount,
+    bool processAutoReinvest
+  ) private {
+    bool success = IERC20Upgradeable(dividendToken).transfer(
+      address(dividendPayingTracker),
+      amount
+    );
+    if (success) {
+      dividendPayingTracker.distributeDividends(amount, processAutoReinvest);
+      emit SendDividends(amount);
     }
   }
 
@@ -549,23 +552,6 @@ contract PrismaToken is
       gas,
       tx.origin
     );
-  }
-
-  function transferDividends(
-    address dividendToken,
-    address dividendTracker,
-    IPrismaDividendTracker dividendPayingTracker,
-    uint256 amount,
-    bool processAutoReinvest
-  ) private {
-    bool success = IERC20Upgradeable(dividendToken).transfer(
-      dividendTracker,
-      amount
-    );
-    if (success) {
-      dividendPayingTracker.distributeDividends(amount, processAutoReinvest);
-      emit SendDividends(amount);
-    }
   }
 
   //////////////////////
