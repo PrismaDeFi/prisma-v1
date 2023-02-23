@@ -570,11 +570,11 @@ contract PrismaDividendTrackerV1 is
       int256 index,
       int256 iterationsUntilProcessed,
       uint256 withdrawableDividends,
-      uint256 totalDividends,
-      uint256 lastClaimTime,
-      uint256 nextClaimTime,
-      uint256 secondsUntilAutoClaimAvailable
+      uint256 totalDividends
     )
+  // uint256 lastClaimTime,
+  // uint256 nextClaimTime,
+  // uint256 secondsUntilAutoClaimAvailable
   {
     account = _account;
 
@@ -598,13 +598,13 @@ contract PrismaDividendTrackerV1 is
     withdrawableDividends = withdrawableDividendOf(account);
     totalDividends = accumulativeDividendOf(account);
 
-    lastClaimTime = lastClaimTimes[account];
+    // lastClaimTime = lastClaimTimes[account];
 
-    nextClaimTime = lastClaimTime > 0 ? lastClaimTime + claimWait : 0;
+    // nextClaimTime = lastClaimTime > 0 ? lastClaimTime + claimWait : 0;
 
-    secondsUntilAutoClaimAvailable = nextClaimTime > block.timestamp
-      ? nextClaimTime - block.timestamp
-      : 0;
+    // secondsUntilAutoClaimAvailable = nextClaimTime > block.timestamp
+    //   ? nextClaimTime - block.timestamp
+    //   : 0;
   }
 
   /**
@@ -613,19 +613,9 @@ contract PrismaDividendTrackerV1 is
    */
   function getAccountAtIndex(
     uint256 index
-  )
-    public
-    view
-    returns (
-      address,
-      int256,
-      int256,
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
-    )
+  ) public view returns (address, int256, int256, uint256, uint256) // uint256,
+  // uint256,
+  // uint256
   {
     if (index >= tokenHoldersMap.size()) {
       return (
@@ -633,10 +623,10 @@ contract PrismaDividendTrackerV1 is
         -1,
         -1,
         0,
-        0,
-        0,
-        0,
         0
+        // 0,
+        // 0,
+        // 0
       );
     }
 

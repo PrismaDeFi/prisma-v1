@@ -28,12 +28,6 @@ interface IPrismaDividendTracker {
   function includeFromDividends(address account) external;
 
   /**
-   * @notice Updates the minimum wait between dividend claims
-   * @dev Emits a `ClaimWaitUpdated` event
-   */
-  function updateClaimWait(uint256 newClaimWait) external;
-
-  /**
    * @notice Returns the last processed index in the `tokenHoldersMap` iterable mapping
    * @return uint256 last processed index
    */
@@ -59,10 +53,7 @@ interface IPrismaDividendTracker {
       int256 index,
       int256 iterationsUntilProcessed,
       uint256 withdrawableDividends,
-      uint256 totalDividends,
-      uint256 lastClaimTime,
-      uint256 nextClaimTime,
-      uint256 secondsUntilAutoClaimAvailable
+      uint256 totalDividends
     );
 
   /**
@@ -71,25 +62,7 @@ interface IPrismaDividendTracker {
    */
   function getAccountAtIndex(
     uint256 index
-  )
-    external
-    view
-    returns (
-      address,
-      int256,
-      int256,
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
-    );
-
-  /**
-   * @notice Used to check if an account is ready to claim
-   * @return bool is ready to claim
-   */
-  function canAutoClaim(uint256 lastClaimTime) external view returns (bool);
+  ) external view returns (address, int256, int256, uint256, uint256);
 
   /**
    * @notice Sets the dividend balance of an account and processes its dividends
@@ -140,12 +113,6 @@ interface IPrismaDividendTracker {
    * @dev Returns the amount of tokens owned by `account`.
    */
   function balanceOf(address account) external view returns (uint256);
-
-  /**
-   * @notice Returns the wait between manual dividend claims
-   * @dev Can be set `updateClaimWait`
-   */
-  function getDividendClaimWait() external view returns (uint256);
 
   /**
    * @notice Returns the total amount of dividends distributed by the contract

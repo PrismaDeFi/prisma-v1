@@ -612,10 +612,6 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     );
   }
 
-  function updateClaimWait(uint256 claimWait) external onlyOwner {
-    prismaDividendTracker.updateClaimWait(claimWait);
-  }
-
   function updatePrismaDividendToken(
     address _newContract,
     uint256 gas
@@ -631,10 +627,6 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
   function getPrismaDividendTracker() external view returns (address pair) {
     return address(prismaDividendTracker);
-  }
-
-  function getPrismaDividendClaimWait() external view returns (uint256) {
-    return prismaDividendTracker.getDividendClaimWait();
   }
 
   function getTotalPrismaDividendsDistributed()
@@ -659,39 +651,13 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
   function getAccountPrismaDividendsInfo(
     address account
-  )
-    external
-    view
-    returns (
-      address,
-      int256,
-      int256,
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
-    )
-  {
+  ) external view returns (address, int256, int256, uint256, uint256) {
     return prismaDividendTracker.getAccount(account);
   }
 
   function getAccountPrismaDividendsInfoAtIndex(
     uint256 index
-  )
-    external
-    view
-    returns (
-      address,
-      int256,
-      int256,
-      uint256,
-      uint256,
-      uint256,
-      uint256,
-      uint256
-    )
-  {
+  ) external view returns (address, int256, int256, uint256, uint256) {
     return prismaDividendTracker.getAccountAtIndex(index);
   }
 

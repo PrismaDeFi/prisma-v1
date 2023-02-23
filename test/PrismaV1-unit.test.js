@@ -96,10 +96,6 @@ describe("PrismaV1 Test", () => {
         (await prismaToken.totalSupply()).toString(),
         ethers.utils.parseEther("100000000")
       )
-      assert.equal(
-        (await prismaToken.getPrismaDividendClaimWait()).toString(),
-        "60"
-      )
     })
     it("cannot be reinizialized", async () => {
       await expect(
