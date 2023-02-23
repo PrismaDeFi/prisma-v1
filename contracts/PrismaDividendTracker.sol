@@ -242,7 +242,7 @@ contract PrismaDividendTracker is
       totalDividendsDistributed = totalDividendsDistributed + amount;
 
       if (_processAutoReinvest) {
-        reinvestV2();
+        autoReinvest();
       }
     }
   }
@@ -287,7 +287,7 @@ contract PrismaDividendTracker is
         if (processReinvest(account, true)) {
           claims++;
         }
-      } else if (processAccount(account, true)) {
+      } else if (processAccount(account, true, 0)) {
         claims++;
       }
 
@@ -314,12 +314,19 @@ contract PrismaDividendTracker is
    */
   function processAccount(
     address account,
-    bool automatic
+    bool automatic,
+    uint256 amount
   ) public onlyOwner returns (bool) {
-    uint256 amount = _withdrawDividendOfUser(account);
+    uint256 _amount;
+    if (amount == 0) {
+      uint256 _withdrawableDividend = withdrawableDividendOf(account);
+      _amount = _withdrawDividendOfUser(account, _withdrawableDividend);
+    } else {
+      _amount = _withdrawDividendOfUser(account, amount);
+    }
 
-    if (amount > 0) {
-      emit Claim(account, amount, automatic);
+    if (_amount > 0) {
+      emit Claim(account, _amount, automatic);
       return true;
     }
 
@@ -330,37 +337,30 @@ contract PrismaDividendTracker is
    * @notice Withdraws the ether distributed to the sender.
    * @dev It emits a `DividendWithdrawn` event if the amount of withdrawn ether is greater than 0.
    */
-  function withdrawDividend() public {
-    _withdrawDividendOfUser(msg.sender);
-  }
 
-  function _withdrawDividendOfUser(address user) internal returns (uint256) {
+  function _withdrawDividendOfUser(
+    address user,
+    uint256 amount
+  ) internal returns (uint256) {
     uint256 _withdrawableDividend = withdrawableDividendOf(user);
 
-    if (_withdrawableDividend > 0) {
-      withdrawnDividends[user] =
-        withdrawnDividends[user] +
-        _withdrawableDividend;
+    if (_withdrawableDividend > 0 && amount <= _withdrawableDividend) {
+      withdrawnDividends[user] = withdrawnDividends[user] + amount;
 
       uint256 _nonReinvestableDividend = nonReinvestableDividend[user];
       nonReinvestableDividend[user] = 0; //User is withdrawing non reinvestable dividend too, so set it to 0;
 
-      bool success = IERC20Upgradeable(dividendToken).transfer(
-        user,
-        _withdrawableDividend
-      );
+      bool success = IERC20Upgradeable(dividendToken).transfer(user, amount);
 
       if (!success) {
-        withdrawnDividends[user] =
-          withdrawnDividends[user] -
-          _withdrawableDividend;
+        withdrawnDividends[user] = withdrawnDividends[user] - amount;
         nonReinvestableDividend[user] = _nonReinvestableDividend;
         return 0;
       }
 
-      emit DividendWithdrawn(user, _withdrawableDividend);
+      emit DividendWithdrawn(user, amount);
 
-      return _withdrawableDividend;
+      return amount;
     }
 
     return 0;
@@ -373,7 +373,7 @@ contract PrismaDividendTracker is
   /**
    * @dev need to rename the function and check modifier
    */
-  function reinvestV2() private {
+  function autoReinvest() private {
     uint256 _totalStakedPrisma = prisma.getTotalStakedAmount();
     uint256 _totalUnclaimedDividend = IERC20Upgradeable(dividendToken)
       .balanceOf(address(this));
@@ -412,7 +412,7 @@ contract PrismaDividendTracker is
         (_contractPrismaBalance * magnitude) /
         _totalStakedPrisma;
 
-      process(1_000_000, true);
+      process(10_000_000, true);
 
       _magnifiedPrismaPerShare = 0;
 
@@ -477,28 +477,24 @@ contract PrismaDividendTracker is
   }
 
   /**
-   * @dev modify this so that a user can reinvest any amount equal to or less than his `withdrawableDividendOf` dividend
-   * We need a method to remove ` _withdrawableDividend` from `withdrawnDividends[msg.sender]` if trasnaction fail
+   * @notice Allows users to manually reinvest an arbitrary amount of dividends
    */
-  function manualReinvestV2() external {
+  function manualReinvest(uint256 amount) external {
     require(
       !_processingAutoReinvest,
       "Not allowed for now, try after sometime!"
     );
     uint256 _withdrawableDividend = withdrawableDividendOf(msg.sender);
-    if (_withdrawableDividend > 0) {
+    if (_withdrawableDividend > 0 && amount <= _withdrawableDividend) {
       uint256 balanceBefore = prisma.balanceOf(address(this));
 
-      withdrawnDividends[msg.sender] += _withdrawableDividend;
-      IERC20Upgradeable(dividendToken).approve(
-        address(router),
-        _withdrawableDividend
-      );
+      withdrawnDividends[msg.sender] += amount;
+      IERC20Upgradeable(dividendToken).approve(address(router), amount);
       address[] memory path = new address[](2);
       path[0] = dividendToken;
       path[1] = address(prisma);
       router.swapExactTokensForTokens(
-        _withdrawableDividend,
+        amount,
         0,
         path,
         address(this),
@@ -506,66 +502,9 @@ contract PrismaDividendTracker is
       );
       uint256 balanceAfter = prisma.balanceOf(address(this));
 
-      uint256 _userPrisma = balanceAfter - balanceBefore;
-      bool success = prisma.transfer(msg.sender, _userPrisma);
-      if (success) {
-        emit Reinvested(
-          address(msg.sender),
-          _withdrawableDividend,
-          _userPrisma,
-          false
-        );
-      } else {
-        require(false, "Manual reinvestment failed");
-        //we can add event to catch failed manual reinvest
-      }
-    }
-  }
-
-  /**
-   * @dev Calle version of manualReinvest from main branch
-   * Do we need to remove `nonReinvestableDividend[_user]` from `_userDividend` ? In case he has not claimed/got his dividend earlier? Same as we are doing in auto reinvestment.
-   * We need a method to remove ` _withdrawableDividend` from `withdrawnDividends[msg.sender]` if trasnaction fail
-   */
-
-  function manualReinvest() external {
-    uint256 _userStakedPrisma = prisma.getStakedPrisma(msg.sender);
-    uint256 _userTotalPrisma = prisma.balanceOf(msg.sender);
-    uint256 _userDividend = withdrawableDividendOf(msg.sender) -
-      nonReinvestableDividend[msg.sender];
-    uint256 _reinvestAmount = (_userDividend *
-      ((_userStakedPrisma * magnitude) / _userTotalPrisma)) / magnitude;
-
-    if (_reinvestAmount > 0) {
-      uint256 balanceBefore = prisma.balanceOf(address(this));
-
-      // added this
-      withdrawnDividends[msg.sender] += _reinvestAmount;
-
-      IERC20Upgradeable(dividendToken).approve(
-        address(router),
-        _reinvestAmount
-      );
-      address[] memory path = new address[](2);
-      path[0] = dividendToken;
-      path[1] = address(prisma);
-      router.swapExactTokensForTokens(
-        _reinvestAmount,
-        0,
-        path,
-        address(this),
-        block.timestamp
-      );
-
-      uint256 balanceAfter = prisma.balanceOf(address(this));
+      // Dividends Correction?
 
       uint256 _userPrisma = balanceAfter - balanceBefore;
-
-      // I think we should not do correction here. We should do it by calling setBalance from `PrismaToken.sol` (Just like Lunamoon contract). Also, we need this to do in other functions.
-      magnifiedDividendCorrections[msg.sender] =
-        magnifiedDividendCorrections[msg.sender] -
-        int(_reinvestAmount * magnitude);
-
       prisma.compoundPrisma(msg.sender, _userPrisma);
     }
   }

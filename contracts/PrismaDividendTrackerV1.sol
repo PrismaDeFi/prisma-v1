@@ -11,7 +11,7 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
-contract PrismaDividendTrackerV1 is
+abstract contract PrismaDividendTrackerV1 is
   IPrismaDividendTracker,
   ERC20Upgradeable,
   OwnableUpgradeable
@@ -613,7 +613,16 @@ contract PrismaDividendTrackerV1 is
    */
   function getAccountAtIndex(
     uint256 index
-  ) public view returns (address, int256, int256, uint256, uint256) // uint256,
+  )
+    public
+    view
+    returns (
+      address,
+      int256,
+      int256,
+      uint256,
+      uint256 // uint256,
+    )
   // uint256,
   // uint256
   {

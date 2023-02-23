@@ -490,8 +490,8 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   // Dividends Processing //
   //////////////////////////
 
-  function claim() external {
-    prismaDividendTracker.processAccount(payable(msg.sender), false);
+  function claim(uint256 amount) external {
+    prismaDividendTracker.processAccount(payable(msg.sender), false, amount);
   }
 
   function setDividends(address from, address to) external {

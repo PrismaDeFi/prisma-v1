@@ -86,7 +86,8 @@ interface IPrismaDividendTracker {
    */
   function processAccount(
     address account,
-    bool automatic
+    bool automatic,
+    uint256 amount
   ) external returns (bool);
 
   /**
