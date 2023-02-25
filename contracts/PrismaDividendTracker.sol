@@ -174,8 +174,7 @@ contract PrismaDividendTracker is
   ////////////////////////////
 
   /**
-   * @notice Sets the dividend balance of an account and processes its dividends
-   * @dev Calls the `processAccount` function
+   * @notice Updates the holders struct
    */
   function setBalance(
     address payable account,
@@ -196,7 +195,6 @@ contract PrismaDividendTracker is
 
   /**
    * @notice Sets the balance of a user and adjusts supply accordingly
-   * @dev Used in the `DividendTracker` contract
    */
   function _setBalance(address account, uint256 newBalance) internal {
     uint256 currentBalance = balanceOf(account);
@@ -367,19 +365,13 @@ contract PrismaDividendTracker is
   }
 
   ////////////////////////////
-  // Dividends Reinvestmnet //
+  // Dividends Reinvestmnent //
   ////////////////////////////
 
-  /**
-   * @dev need to rename the function and check modifier
-   */
   function autoReinvest() private {
     uint256 _totalStakedPrisma = prisma.getTotalStakedAmount();
     uint256 _totalUnclaimedDividend = IERC20Upgradeable(dividendToken)
       .balanceOf(address(this));
-
-    // 👆 ^^ `_totalUnclaimedDividend` has a flaw of including user's dividends which are not claimed by them. (This happen in case we hault auto dividend processing and users don't manually calim their dividend against unstaked prisma)
-
     uint256 _reinvestAmount;
     if (_totalStakedPrisma > 10 && _totalUnclaimedDividend > 10) {
       _processingAutoReinvest = true;
@@ -425,14 +417,15 @@ contract PrismaDividendTracker is
   }
 
   /**
-   * @dev This function calculate the reinvestable dividend of user and used in auto reinvestment process.
-   * This function has nothing to do with manual reinvestment
-   * It returns the net reinvestable dividend by substracting the nonReinvestable dividend
-   * `nonReinvestableDividend[_user]` is dividend equal to his unstaked prisma balance
-   * `nonReinvestableDividend[_user]` is set to 0 when user withdraw his dividend or he get it thru auto processing in `_withdrawDividendOfUser` function.
-   * QUESTION: Do we need to use `magnitude` below????
+   * @dev This function is used when we process auto reinvest in `_withdrawDividendOfUser`
+   * It add the dividend equivalent to transfered prisma in `withdrawnDividends[user]`
+   * It compound the prisma to user prisma balance
+   *
    */
-  function dividendToReinvest(address _user) public returns (uint256) {
+  function processReinvest(
+    address _user,
+    bool _automatic
+  ) public returns (bool) {
     uint256 _userStakedPrisma = prisma.getStakedPrisma(_user);
 
     uint256 _reinvestableDividend = withdrawableDividendOf(_user) -
@@ -447,30 +440,11 @@ contract PrismaDividendTracker is
 
     nonReinvestableDividend[_user] += _nonReinvestableAmount;
 
-    return _amountToReinvest;
-  }
-
-  /**
-   * @dev This function is used when we process auto reinvest in `_withdrawDividendOfUser`
-   * It add the dividend equivalent to transfered prisma in `withdrawnDividends[user]`
-   * It compound the prisma to user prisma balance
-   *
-   */
-  function processReinvest(
-    address _user,
-    bool _automatic
-  ) public returns (bool) {
-    uint256 _reinvestedDividend = dividendToReinvest(_user);
-    if (_reinvestedDividend > 0) {
-      withdrawnDividends[_user] += _reinvestedDividend;
+    if (_amountToReinvest > 0) {
+      withdrawnDividends[_user] += _amountToReinvest;
       uint256 _prismaToCompound = distributeEarnedPrisma(_user);
       prisma.compoundPrisma(_user, _prismaToCompound);
-      emit Reinvested(
-        _user,
-        _reinvestedDividend,
-        _prismaToCompound,
-        _automatic
-      );
+      emit Reinvested(_user, _amountToReinvest, _prismaToCompound, _automatic);
       return true;
     }
     return false;
