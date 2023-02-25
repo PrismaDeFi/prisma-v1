@@ -69,7 +69,7 @@ describe("PrismaV1 Test", () => {
     await tracker.excludeFromDividends(pairAddress)
     await tracker.transferOwnership(prismaToken.address)
 
-    await busd.transfer(prismaToken.address, ethers.utils.parseEther("1000"))
+    await busd.transfer(tracker.address, ethers.utils.parseEther("1000"))
 
     await prismaToken.approve(this.router.address, INITIAL_PRISMA_LIQUIDITY)
     await busd.approve(this.router.address, INITIAL_BUSD_LIQUIDITY)
@@ -254,9 +254,9 @@ describe("PrismaV1 Test", () => {
       )
     })
   })
-  describe("processDividends", () => {
+  describe("distributeDividends", () => {
     it("distributes dividends", async () => {
-      await prismaToken.processDividends()
+      await tracker.distributeDividends(false)
       assert.equal(
         BigInt(await prismaToken.getTotalPrismaDividendsDistributed()) /
           BigInt(10 ** 18),
@@ -270,7 +270,7 @@ describe("PrismaV1 Test", () => {
       )
     })
     it("corrects dividends", async () => {
-      await prismaToken.processDividends()
+      await tracker.distributeDividends(true)
       await prismaToken.transfer(
         user.address,
         ethers.utils.parseEther("1000000")
@@ -289,32 +289,36 @@ describe("PrismaV1 Test", () => {
   })
   describe("claim", () => {
     it("can withdraw dividends", async () => {
-      await prismaToken.processDividends()
       const balanceBefore = await busd.balanceOf(deployer.address)
-      const dividends = await prismaToken.withdrawablePrismaDividendOf(
-        deployer.address
+      const share = await tracker.balanceOf(deployer.address)
+      const dividends = await busd.balanceOf(tracker.address)
+      const shares = await tracker.totalSupply()
+      const dps = (BigInt(dividends) * BigInt(2 ** 128)) / BigInt(shares)
+      const dividend = (BigInt(share) * BigInt(dps)) / BigInt(2 ** 128)
+      await tracker.distributeDividends(false)
+      await tracker.processAccount(
+        deployer.address,
+        false,
+        ethers.utils.parseEther("999")
       )
-      await prismaToken.claim(ethers.utils.parseEther("999"))
-      assert(dividends > 0)
       assert.equal(
         BigInt(await busd.balanceOf(deployer.address)) / BigInt(10 ** 18),
         BigInt(balanceBefore) / BigInt(10 ** 18) +
-          BigInt(dividends) / BigInt(10 ** 18)
+          BigInt(dividend) / BigInt(10 ** 18)
       )
     })
     it("can reinvest all dividends", async () => {
       await prismaToken.stakePrisma(ethers.utils.parseEther("21000000"))
-      const busdDividends = await busd.balanceOf(prismaToken.address)
+      const busdDividends = await busd.balanceOf(tracker.address)
       const stakedBefore = await prismaToken.getTotalStakedAmount()
-      const totalStake = await prismaToken.getTotalStakedAmount()
       const totalPrisma = await tracker.totalSupply()
       const amountIn =
         (BigInt(busdDividends) *
-          ((BigInt(totalStake) * BigInt(2 ** 128)) / BigInt(totalPrisma))) /
+          ((BigInt(stakedBefore) * BigInt(2 ** 128)) / BigInt(totalPrisma))) /
         BigInt(2 ** 128)
       const path = [busd.address, prismaToken.address]
       const [, amountOutB] = await this.router.getAmountsOut(amountIn, path)
-      await prismaToken.processDividends()
+      await tracker.distributeDividends(true)
       const stakedAfter = await prismaToken.getTotalStakedAmount()
       const busdBalanceAfter = await busd.balanceOf(tracker.address)
       assert.equal(
@@ -322,14 +326,15 @@ describe("PrismaV1 Test", () => {
         BigInt(stakedBefore) / BigInt(10 ** 18) +
           BigInt(amountOutB) / BigInt(10 ** 18)
       )
-      assert.equal(
-        BigInt(busdBalanceAfter),
-        BigInt(busdDividends) - BigInt(amountIn)
-      )
+      assert.equal(BigInt(busdBalanceAfter) / BigInt(10 ** 18), 0n)
     })
     it("cannot withdraw dividends twice", async () => {
-      await prismaToken.processDividends()
-      await prismaToken.claim(ethers.utils.parseEther("999"))
+      await tracker.distributeDividends(true)
+      await tracker.processAccount(
+        deployer.address,
+        false,
+        ethers.utils.parseEther("999")
+      )
       assert.equal(
         BigInt(await tracker.withdrawableDividendOf(deployer.address)) /
           BigInt(10 ** 18),
@@ -338,8 +343,8 @@ describe("PrismaV1 Test", () => {
     })
   })
   describe("manualReinvest", () => {
-    it("processes arbitrary amount dividends manually", async () => {
-      await prismaToken.processDividends()
+    it("processes arbitrary amount of dividends manually", async () => {
+      await tracker.distributeDividends(false)
       await prismaToken.stakePrisma(ethers.utils.parseEther("21000000"))
       const balanceBefore = await prismaToken.balanceOf(deployer.address)
       const stakedBefore = await prismaToken.getStakedPrisma(deployer.address)
@@ -371,24 +376,24 @@ describe("PrismaV1 Test", () => {
   })
   describe("processDividendTracker", () => {
     it("processes dividends automatically", async () => {
-      await prismaToken.processDividends()
       const balanceBefore = await busd.balanceOf(deployer.address)
-      const dividends = await prismaToken.withdrawablePrismaDividendOf(
-        deployer.address
-      )
-      await prismaToken.processDividendTracker("1000000", false)
-      assert(dividends > 0)
+      const share = await tracker.balanceOf(deployer.address)
+      const dividends = await busd.balanceOf(tracker.address)
+      const shares = await tracker.totalSupply()
+      const dps = (BigInt(dividends) * BigInt(2 ** 128)) / BigInt(shares)
+      const dividend = (BigInt(share) * BigInt(dps)) / BigInt(2 ** 128)
+      await tracker.distributeDividends(true)
       assert.equal(
         BigInt(await busd.balanceOf(deployer.address)) / BigInt(10 ** 18),
         BigInt(balanceBefore) / BigInt(10 ** 18) +
-          BigInt(dividends) / BigInt(10 ** 18)
+          BigInt(dividend) / BigInt(10 ** 18)
       )
     })
     it("processes reinvestment automatically", async () => {
       await prismaToken.stakePrisma(ethers.utils.parseEther("21000000"))
       const balanceBefore = await prismaToken.balanceOf(deployer.address)
       const stakedBefore = await prismaToken.getStakedPrisma(deployer.address)
-      const busdDividends = await busd.balanceOf(prismaToken.address)
+      const busdDividends = await busd.balanceOf(tracker.address)
       const prismaInTracker = await prismaToken.balanceOf(tracker.address)
       const totalStake = await prismaToken.getTotalStakedAmount()
       const totalPrisma = await tracker.totalSupply()
@@ -403,7 +408,7 @@ describe("PrismaV1 Test", () => {
         BigInt(totalStake)
       const prismaDividend =
         (BigInt(prismaPerShare) * BigInt(stakedBefore)) / BigInt(2 ** 128)
-      await prismaToken.processDividends()
+      await tracker.distributeDividends(true)
       const balanceAfter = await prismaToken.balanceOf(deployer.address)
       const stakedAfter = await prismaToken.getStakedPrisma(deployer.address)
       assert.equal(
@@ -431,12 +436,11 @@ describe("PrismaV1 Test", () => {
     //       ethers.utils.parseEther("10000")
     //     )
     //   }
-    //   await prismaToken.processDividends()
+    //   await tracker.distributeDividends(true)
     //   const balanceBefore = await busd.balanceOf(deployer.address)
     //   const dividends = await prismaToken.withdrawablePrismaDividendOf(
     //     deployer.address
     //   )
-    //   await prismaToken.processDividendTracker("30000000", false)
     //   assert.equal(
     //     BigInt(await busd.balanceOf(deployer.address)) / BigInt(10 ** 18),
     //     BigInt(balanceBefore) / BigInt(10 ** 18) +
@@ -458,7 +462,7 @@ describe("PrismaV1 Test", () => {
     //     })
     //     await prismaUser.stakePrisma(ethers.utils.parseEther("5000"))
     //   }
-    //   const busdDividends = await busd.balanceOf(prismaToken.address)
+    //   const busdDividends = await busd.balanceOf(tracker.address)
     //   const totalStakeBefore = await prismaToken.getTotalStakedAmount()
     //   const totalPrisma = await tracker.totalSupply()
     //   const amountIn =
@@ -468,7 +472,7 @@ describe("PrismaV1 Test", () => {
     //     BigInt(2 ** 128)
     //   const path = [busd.address, prismaToken.address]
     //   const [, amountOutB] = await this.router.getAmountsOut(amountIn, path)
-    //   await prismaToken.processDividends()
+    //   await tracker.distributeDividends(true)
     //   const totalStakeAfter = await prismaToken.getTotalStakedAmount()
     //   assert.equal(
     //     BigInt(totalStakeAfter) / BigInt(10 ** 18),

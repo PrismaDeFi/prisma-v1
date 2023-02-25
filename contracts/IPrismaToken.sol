@@ -9,6 +9,8 @@ interface IPrismaToken {
 
   function compoundPrisma(address _staker, uint256 _prismaToCompound) external;
 
+  function getMultisig() external view returns (address);
+
   function getStakedPrisma(address _user) external view returns (uint256);
 
   function getTotalStakedAmount() external view returns (uint256);

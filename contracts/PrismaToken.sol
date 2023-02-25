@@ -21,9 +21,9 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
   IPrismaDividendTracker private prismaDividendTracker;
 
-  address public multisig;
-  address public liquidityReceiver;
-  address public treasuryReceiver;
+  address private multisig;
+  address private liquidityReceiver;
+  address private treasuryReceiver;
   address private prismaDividendToken;
 
   mapping(address => uint256) private _balances;
@@ -46,7 +46,6 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   uint256 private _sellTreasuryFee;
   uint256 private _sellBurnFee;
   uint256 private _minStakeAmount;
-  uint256 private gasForProcessing = 300000;
   uint256 private _totalStakedAmount;
 
   ////////////
@@ -58,21 +57,6 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     address indexed oldAddress
   );
   event PrismaDividendEnabled_Updated(bool enabled);
-  event GasForProcessing_Updated(
-    uint256 indexed newValue,
-    uint256 indexed oldValue
-  );
-
-  event SendDividends(uint256 amount);
-
-  event PrismaDividendTracker_Processed(
-    uint256 iterations,
-    uint256 claims,
-    uint256 lastProcessedIndex,
-    bool indexed automatic,
-    uint256 gas,
-    address indexed processor
-  );
 
   /////////////////
   // INITIALIZER //
@@ -302,56 +286,6 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     emit Transfer(from, to, amountReceived);
   }
 
-  //////////////////////////
-  // Dividends Processing //
-  //////////////////////////
-
-  function claim(uint256 amount) external {
-    prismaDividendTracker.processAccount(payable(msg.sender), false, amount);
-  }
-
-  function processDividends() public {
-    uint256 balance = prismaDividendTracker.balanceOf(msg.sender);
-    if (processDividendStatus) {
-      if (balance > 10000000000) {
-        // 0,00000001 BNB
-        uint256 dividends = IERC20Upgradeable(prismaDividendToken).balanceOf(
-          address(this)
-        );
-        bool success = IERC20Upgradeable(prismaDividendToken).transfer(
-          address(prismaDividendTracker),
-          dividends
-        );
-        if (success) {
-          prismaDividendTracker.distributeDividends(
-            dividends,
-            _processAutoReinvest
-          );
-          emit SendDividends(dividends);
-        }
-      }
-    }
-  }
-
-  function processDividendTracker(
-    uint256 gas,
-    bool reinvesting
-  ) public onlyOwner {
-    (
-      uint256 Iterations,
-      uint256 Claims,
-      uint256 LastProcessedIndex
-    ) = prismaDividendTracker.process(gas, reinvesting);
-    emit PrismaDividendTracker_Processed(
-      Iterations,
-      Claims,
-      LastProcessedIndex,
-      false,
-      gas,
-      tx.origin
-    );
-  }
-
   //////////////
   // Staking //
   ////////////
@@ -429,6 +363,16 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     _balances[msg.sender] -= _prismaToCompound;
     _stakedPrisma[_staker] += _prismaToCompound;
     _totalStakedAmount += _prismaToCompound;
+
+    try
+      prismaDividendTracker.setBalance(
+        payable(msg.sender),
+        balanceOf(msg.sender)
+      )
+    {} catch {}
+    try
+      prismaDividendTracker.setBalance(payable(_staker), balanceOf(_staker))
+    {} catch {}
   }
 
   //////////////////////
@@ -503,15 +447,6 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     prismaDividendTracker.excludeFromDividends(address(account));
   }
 
-  function updateGasForProcessing(uint256 newValue) external onlyOwner {
-    require(
-      newValue != gasForProcessing,
-      "Cannot update gasForProcessing to same value"
-    );
-    gasForProcessing = newValue;
-    emit GasForProcessing_Updated(newValue, gasForProcessing);
-  }
-
   function updateMinimumBalanceForDividends(
     uint256 newMinimumBalance
   ) external onlyOwner {
@@ -582,6 +517,10 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
   function getSellBurnFee() external view returns (uint256) {
     return _sellBurnFee;
+  }
+
+  function getMultisig() external view returns (address) {
+    return multisig;
   }
 
   function getPrismaDividendTracker() external view returns (address pair) {
