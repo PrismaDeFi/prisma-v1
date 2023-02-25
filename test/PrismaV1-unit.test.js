@@ -436,15 +436,25 @@ describe("PrismaV1 Test", () => {
     //       ethers.utils.parseEther("10000")
     //     )
     //   }
+    //   const dividends = await busd.balanceOf(tracker.address)
+    //   const shares = await tracker.totalSupply()
+    //   const dps = (BigInt(dividends) * BigInt(2 ** 128)) / BigInt(shares)
+    //   const balanceBeforeD = await busd.balanceOf(deployer.address)
+    //   const shareD = await tracker.balanceOf(deployer.address)
+    //   const dividendD = (BigInt(shareD) * BigInt(dps)) / BigInt(2 ** 128)
+    //   const balanceBeforeR = await busd.balanceOf(wallet.address)
+    //   const shareR = await tracker.balanceOf(wallet.address)
+    //   const dividendR = (BigInt(shareR) * BigInt(dps)) / BigInt(2 ** 128)
     //   await tracker.distributeDividends(true)
-    //   const balanceBefore = await busd.balanceOf(deployer.address)
-    //   const dividends = await prismaToken.withdrawablePrismaDividendOf(
-    //     deployer.address
-    //   )
     //   assert.equal(
     //     BigInt(await busd.balanceOf(deployer.address)) / BigInt(10 ** 18),
-    //     BigInt(balanceBefore) / BigInt(10 ** 18) +
-    //       BigInt(dividends) / BigInt(10 ** 18)
+    //     BigInt(balanceBeforeD) / BigInt(10 ** 18) +
+    //       BigInt(dividendD) / BigInt(10 ** 18)
+    //   )
+    //   assert.equal(
+    //     BigInt(await busd.balanceOf(wallet.address)) / BigInt(10 ** 18),
+    //     BigInt(balanceBeforeR) / BigInt(10 ** 18) +
+    //       BigInt(dividendR) / BigInt(10 ** 18)
     //   )
     // })
     // it("reinvests dividends for multiple holders", async () => {
