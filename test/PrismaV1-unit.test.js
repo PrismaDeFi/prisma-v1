@@ -49,7 +49,11 @@ describe("PrismaV1 Test", () => {
     await this.router.deployTransaction.wait()
 
     prismaMultisig = prismaToken.connect(multisig)
-    await prismaMultisig.init(busd.address, tracker.address)
+    await prismaMultisig.init(
+      busd.address,
+      tracker.address,
+      this.router.address
+    )
     await prismaMultisig.transfer(
       deployer.address,
       ethers.utils.parseEther("100000000")
@@ -140,7 +144,7 @@ describe("PrismaV1 Test", () => {
       )
     })
     it("sell orders are taxed correctly", async () => {
-      const amountIn = ethers.utils.parseEther("10000")
+      const amountIn = ethers.utils.parseEther("1000000")
       const path = [prismaToken.address, busd.address]
       await prismaToken.approve(this.router.address, amountIn)
       const prismaBalanceBefore = await prismaToken.balanceOf(deployer.address)
@@ -161,6 +165,19 @@ describe("PrismaV1 Test", () => {
       )
       const prismaBalanceAfter = await prismaToken.balanceOf(deployer.address)
       const busdBalanceAfter = await busd.balanceOf(deployer.address)
+      await this.router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        amountIn,
+        0,
+        path,
+        deployer.address,
+        (await ethers.provider.getBlock()).timestamp + 100
+      )
+      console.log(
+        BigInt(await busd.balanceOf(treasury.address)) / BigInt(10 ** 18)
+      )
+      console.log(
+        BigInt(await busd.balanceOf(tracker.address)) / BigInt(10 ** 18)
+      )
       assert.equal(
         BigInt(busdBalanceAfter) / BigInt(10 ** 18),
         BigInt(busdBalanceBefore) / BigInt(10 ** 18) +

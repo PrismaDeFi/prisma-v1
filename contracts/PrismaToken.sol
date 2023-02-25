@@ -4,6 +4,7 @@ pragma solidity 0.8.17;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "./IPrismaToken.sol";
 import "./IPrismaDividendTracker.sol";
 
@@ -20,10 +21,12 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   ///////////////
 
   IPrismaDividendTracker private prismaDividendTracker;
+  IUniswapV2Router02 private _router;
 
   address private multisig;
   address private liquidityReceiver;
   address private treasuryReceiver;
+  address private burnReceiver;
   address private prismaDividendToken;
 
   mapping(address => uint256) private _balances;
@@ -33,6 +36,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   mapping(address => uint256) private _stakedPrisma;
   mapping(address => bool) private _notStakingQualified;
 
+  bool private _isInternalTransaction;
   bool private _stakingEnabled;
   bool private processDividendStatus = true;
   bool private prismaDividendEnabled = true;
@@ -47,11 +51,14 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   uint256 private _sellBurnFee;
   uint256 private _minStakeAmount;
   uint256 private _totalStakedAmount;
+  uint256 private _minSwapFees = 10_000 * 10 ** 18;
 
   ////////////
   // Events //
   ////////////
 
+  event TreasuryFeeCollected(uint256 amount);
+  event BurnFeeCollected(uint256 amount);
   event PrismaDividendTracker_Updated(
     address indexed newAddress,
     address indexed oldAddress
@@ -69,7 +76,8 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
    */
   function init(
     address _prismaDividendToken,
-    address _tracker
+    address _tracker,
+    address router_
   ) public initializer {
     __Ownable_init();
     __ERC20_init("Prisma Finance", "PRISMA");
@@ -77,6 +85,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     liquidityReceiver = 0x90F79bf6EB2c4f870365E785982E1f101E93b906; // development wallet
     treasuryReceiver = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65; // development wallet
     multisig = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; // development wallet
+    _router = IUniswapV2Router02(router_);
     _totalSupply = 100_000_000 * (10 ** 18);
     _buyLiquidityFee = 2;
     _buyTreasuryFee = 2;
@@ -210,63 +219,87 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   function _transferFrom(address from, address to, uint256 amount) internal {
     require(from != address(0), "ERC20: transfer from the zero address");
     require(to != address(0), "ERC20: transfer to the zero address");
+    bool overMinSwapFees = balanceOf(address(prismaDividendTracker)) >=
+      _minSwapFees;
 
     uint256 fromBalance = _balances[from];
     // require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
 
     uint256 fee;
 
-    // Buy order
-    if (_automatedMarketMakerPairs[from] && !_isFeeExempt[to]) {
-      if (_buyLiquidityFee > 0) {
-        uint256 liquityFee = (amount * _buyLiquidityFee) / 100;
-        fee += liquityFee;
-        _balances[liquidityReceiver] += liquityFee;
-      }
-      if (_buyTreasuryFee > 0) {
-        uint256 treasuryFee = (amount * _buyTreasuryFee) / 100;
-        fee += treasuryFee;
-        _balances[treasuryReceiver] += treasuryFee;
-      }
-      if (_buyBurnFee > 0) {
-        uint256 burnFee = (amount * _buyBurnFee) / 100;
-        fee += burnFee;
-        _balances[DEAD] += burnFee;
+    if (!_isInternalTransaction) {
+      // Buy order
+      if (_automatedMarketMakerPairs[from] && !_isFeeExempt[to]) {
+        // if (_buyLiquidityFee > 0) {
+        //   uint256 liquityFee = (amount * _buyLiquidityFee) / 100;
+        //   fee += liquityFee;
+        //   _balances[liquidityReceiver] += liquityFee;
+        // }
+        // if (_buyTreasuryFee > 0) {
+        //   uint256 treasuryFee = (amount * _buyTreasuryFee) / 100;
+        //   fee += treasuryFee;
+        //   _balances[treasuryReceiver] += treasuryFee;
+        // }
+        // if (_buyBurnFee > 0) {
+        //   uint256 burnFee = (amount * _buyBurnFee) / 100;
+        //   fee += burnFee;
+        //   _balances[DEAD] += burnFee;
         //Or we can burn directly from supply, comment above and uncomment below
         //_totalSupply -= burnFee;
+        if (getTotalBuyFees() > 0) {
+          fee = (amount * getTotalBuyFees()) / 100;
+          uint256 buyBurn = (fee * _buyBurnFee) / getTotalBuyFees();
+          _balances[address(this)] += fee;
+          _balances[DEAD] += buyBurn;
+        }
+        // }
       }
-    }
-    // Sell order
-    else if (_automatedMarketMakerPairs[to]) {
-      if (_stakedPrisma[from] > 0) {
-        uint256 nonStakedAmount = fromBalance - _stakedPrisma[from];
-        require(nonStakedAmount >= amount, "You need to unstake first");
-      }
+      // Sell order
+      else if (_automatedMarketMakerPairs[to]) {
+        if (_stakedPrisma[from] > 0) {
+          uint256 nonStakedAmount = fromBalance - _stakedPrisma[from];
+          require(nonStakedAmount >= amount, "You need to unstake first");
+        }
 
-      if (!_isFeeExempt[from]) {
-        if (_sellLiquidityFee > 0) {
-          uint256 liquityFee = (amount * _sellLiquidityFee) / 100;
-          fee += liquityFee;
-          _balances[liquidityReceiver] += liquityFee;
+        if (!_isFeeExempt[from]) {
+          // if (_sellLiquidityFee > 0) {
+          //   uint256 liquityFee = (amount * _sellLiquidityFee) / 100;
+          //   fee += liquityFee;
+          //   _balances[liquidityReceiver] += liquityFee;
+          // }
+          // if (_sellTreasuryFee > 0) {
+          //   uint256 treasuryFee = (amount * _sellTreasuryFee) / 100;
+          //   fee += treasuryFee;
+          //   _balances[treasuryReceiver] += treasuryFee;
+          // }
+          // if (_sellBurnFee > 0) {
+          //   uint256 burnFee = (amount * _sellBurnFee) / 100;
+          //   fee += burnFee;
+          //   _balances[DEAD] += burnFee;
+          //   //Or we can burn directly from supply, comment above and uncomment below
+          //   //_totalSupply -= burnFee;
+          // }
+          if (getTotalSellFees() > 0) {
+            fee = (amount * getTotalSellFees()) / 100;
+            _balances[address(prismaDividendTracker)] += fee;
+            if (_sellBurnFee > 0) {
+              uint256 sellBurn = (fee * _sellBurnFee) / getTotalSellFees();
+              _balances[DEAD] += sellBurn;
+            }
+          }
         }
-        if (_sellTreasuryFee > 0) {
-          uint256 treasuryFee = (amount * _sellTreasuryFee) / 100;
-          fee += treasuryFee;
-          _balances[treasuryReceiver] += treasuryFee;
+
+        if (overMinSwapFees) {
+          _isInternalTransaction = true;
+          prismaDividendTracker.swapFees();
+          _isInternalTransaction = false;
         }
-        if (_sellBurnFee > 0) {
-          uint256 burnFee = (amount * _sellBurnFee) / 100;
-          fee += burnFee;
-          _balances[DEAD] += burnFee;
-          //Or we can burn directly from supply, comment above and uncomment below
-          //_totalSupply -= burnFee;
+      } else {
+        // Token Transfer
+        if (_stakedPrisma[from] > 0) {
+          uint256 nonStakedAmount = fromBalance - _stakedPrisma[from];
+          require(nonStakedAmount >= amount, "You need to unstake first");
         }
-      }
-    } else {
-      // Token Transfer
-      if (_stakedPrisma[from] > 0) {
-        uint256 nonStakedAmount = fromBalance - _stakedPrisma[from];
-        require(nonStakedAmount >= amount, "You need to unstake first");
       }
     }
 
@@ -487,11 +520,11 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   // Getter Functions //
   //////////////////////
 
-  function getTotalBuyFees() external view returns (uint256) {
+  function getTotalBuyFees() public view returns (uint256) {
     return _buyLiquidityFee + _buyTreasuryFee + _buyBurnFee;
   }
 
-  function getTotalSellFees() external view returns (uint256) {
+  function getTotalSellFees() public view returns (uint256) {
     return _sellLiquidityFee + _sellTreasuryFee + _sellBurnFee;
   }
 
@@ -521,6 +554,14 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
   function getMultisig() external view returns (address) {
     return multisig;
+  }
+
+  function getTreasury() external view returns (address) {
+    return treasuryReceiver;
+  }
+
+  function getBurn() external view returns (address) {
+    return burnReceiver;
   }
 
   function getPrismaDividendTracker() external view returns (address pair) {

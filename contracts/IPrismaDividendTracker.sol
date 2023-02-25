@@ -98,4 +98,6 @@ interface IPrismaDividendTracker {
   function withdrawableDividendOf(
     address _owner
   ) external view returns (uint256);
+
+  function swapFees() external;
 }

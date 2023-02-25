@@ -173,6 +173,82 @@ contract PrismaDividendTracker is
       int(magnifiedDividendPerShare * value);
   }
 
+  /**
+   * @dev This is only intented for test environment, since Uniswap does not allow setting
+   * the recipient of a swap as one of the tokens being swapped, making it impossible to
+   * collect the swapped fees directly in the main contract. However, this limitation does
+   * not exist when swapping for the chain's native token, which will be our case in prod.
+   */
+
+  function swapFees() external {
+    uint256 balanceBefore = ERC20Upgradeable(dividendToken).balanceOf(
+      address(this)
+    );
+
+    uint256 balance = prisma.balanceOf(address(this));
+    uint256 liquidityFee = (prisma.getSellLiquidityFee() * balance) / 100;
+    uint256 burnFee = (prisma.getSellBurnFee() * balance) / 100;
+    uint256 swapAmount = balance - liquidityFee - burnFee;
+
+    ERC20Upgradeable(address(prisma)).approve(address(router), swapAmount);
+    address[] memory path = new address[](2);
+    path[0] = address(prisma);
+    path[1] = dividendToken;
+    router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+      swapAmount,
+      0,
+      path,
+      address(this),
+      block.timestamp
+    );
+    uint256 balanceAfter = ERC20Upgradeable(dividendToken).balanceOf(
+      address(this)
+    );
+    uint256 collectedFees = balanceAfter - balanceBefore;
+
+    if (burnFee > 0) {
+      super._transfer(address(this), address(0x0), burnFee);
+    }
+
+    uint256 liquidityBNB = (collectedFees * (prisma.getSellLiquidityFee())) /
+      (prisma.getTotalSellFees());
+    if (liquidityBNB > 5) {
+      ERC20Upgradeable(address(prisma)).approve(address(router), liquidityFee);
+      ERC20Upgradeable(address(dividendToken)).approve(
+        address(router),
+        liquidityBNB
+      );
+      router.addLiquidity(
+        address(prisma),
+        dividendToken,
+        liquidityFee,
+        liquidityBNB,
+        0,
+        0,
+        msg.sender,
+        block.timestamp
+      );
+    }
+
+    uint256 treasuryBNB = (collectedFees * (prisma.getSellTreasuryFee())) /
+      (prisma.getTotalSellFees());
+    ERC20Upgradeable(dividendToken).transfer(prisma.getTreasury(), treasuryBNB);
+    // (bool _success, ) = address(treasuryReceiver).call{value: treasuryBNB}("");
+    // if (_success) {
+    //   emit TreasuryFeeCollected(treasuryBNB);
+    // }
+
+    if (burnFee > 0) {
+      uint256 burnBNB = (collectedFees * (prisma.getSellBurnFee())) /
+        (prisma.getTotalSellFees());
+      ERC20Upgradeable(dividendToken).transfer(prisma.getBurn(), burnBNB);
+      // (bool success_, ) = address(burnReceiver).call{value: burnBNB}("");
+      // if (success_) {
+      //   emit BurnFeeCollected(burnBNB);
+      // }
+    }
+  }
+
   ////////////////////////////
   // Dividends Distribution //
   ////////////////////////////
@@ -420,7 +496,7 @@ contract PrismaDividendTracker is
   function processReinvest(
     address _user,
     bool _automatic
-  ) public returns (bool) {
+  ) internal returns (bool) {
     uint256 _reinvestableDividend = withdrawableDividendOf(_user);
 
     if (_reinvestableDividend > 0) {
