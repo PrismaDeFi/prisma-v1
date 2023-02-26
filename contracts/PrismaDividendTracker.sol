@@ -218,7 +218,7 @@ contract PrismaDividendTracker is
         address(router),
         liquidityBNB
       );
-      router.addLiquidity(
+      (, uint256 amountB, ) = router.addLiquidity(
         address(prisma),
         dividendToken,
         liquidityFee,
@@ -228,15 +228,8 @@ contract PrismaDividendTracker is
         msg.sender,
         block.timestamp
       );
+      collectedFees -= amountB;
     }
-
-    uint256 treasuryBNB = (collectedFees * (prisma.getSellTreasuryFee())) /
-      (prisma.getTotalSellFees());
-    ERC20Upgradeable(dividendToken).transfer(prisma.getTreasury(), treasuryBNB);
-    // (bool _success, ) = address(treasuryReceiver).call{value: treasuryBNB}("");
-    // if (_success) {
-    //   emit TreasuryFeeCollected(treasuryBNB);
-    // }
 
     if (burnFee > 0) {
       uint256 burnBNB = (collectedFees * (prisma.getSellBurnFee())) /
@@ -246,7 +239,17 @@ contract PrismaDividendTracker is
       // if (success_) {
       //   emit BurnFeeCollected(burnBNB);
       // }
+      collectedFees -= burnBNB;
     }
+
+    // uint256 treasuryBNB = (collectedFees * (prisma.getSellTreasuryFee())) /
+    //   (prisma.getTotalSellFees());
+    uint256 treasuryBNB = collectedFees;
+    ERC20Upgradeable(dividendToken).transfer(prisma.getTreasury(), treasuryBNB);
+    // (bool _success, ) = address(treasuryReceiver).call{value: treasuryBNB}("");
+    // if (_success) {
+    //   emit TreasuryFeeCollected(treasuryBNB);
+    // }
   }
 
   ////////////////////////////

@@ -219,40 +219,25 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   function _transferFrom(address from, address to, uint256 amount) internal {
     require(from != address(0), "ERC20: transfer from the zero address");
     require(to != address(0), "ERC20: transfer to the zero address");
-    bool overMinSwapFees = balanceOf(address(prismaDividendTracker)) >=
-      _minSwapFees;
 
     uint256 fromBalance = _balances[from];
-    // require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
+
+    bool overMinSwapFees = balanceOf(address(prismaDividendTracker)) >=
+      _minSwapFees;
 
     uint256 fee;
 
     if (!_isInternalTransaction) {
       // Buy order
       if (_automatedMarketMakerPairs[from] && !_isFeeExempt[to]) {
-        // if (_buyLiquidityFee > 0) {
-        //   uint256 liquityFee = (amount * _buyLiquidityFee) / 100;
-        //   fee += liquityFee;
-        //   _balances[liquidityReceiver] += liquityFee;
-        // }
-        // if (_buyTreasuryFee > 0) {
-        //   uint256 treasuryFee = (amount * _buyTreasuryFee) / 100;
-        //   fee += treasuryFee;
-        //   _balances[treasuryReceiver] += treasuryFee;
-        // }
-        // if (_buyBurnFee > 0) {
-        //   uint256 burnFee = (amount * _buyBurnFee) / 100;
-        //   fee += burnFee;
-        //   _balances[DEAD] += burnFee;
-        //Or we can burn directly from supply, comment above and uncomment below
-        //_totalSupply -= burnFee;
         if (getTotalBuyFees() > 0) {
           fee = (amount * getTotalBuyFees()) / 100;
-          uint256 buyBurn = (fee * _buyBurnFee) / getTotalBuyFees();
-          _balances[address(this)] += fee;
-          _balances[DEAD] += buyBurn;
+          _balances[address(prismaDividendTracker)] += fee;
+          if (_buyBurnFee > 0) {
+            uint256 buyBurn = (fee * _buyBurnFee) / getTotalBuyFees();
+            _balances[DEAD] += buyBurn;
+          }
         }
-        // }
       }
       // Sell order
       else if (_automatedMarketMakerPairs[to]) {
@@ -262,23 +247,6 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
         }
 
         if (!_isFeeExempt[from]) {
-          // if (_sellLiquidityFee > 0) {
-          //   uint256 liquityFee = (amount * _sellLiquidityFee) / 100;
-          //   fee += liquityFee;
-          //   _balances[liquidityReceiver] += liquityFee;
-          // }
-          // if (_sellTreasuryFee > 0) {
-          //   uint256 treasuryFee = (amount * _sellTreasuryFee) / 100;
-          //   fee += treasuryFee;
-          //   _balances[treasuryReceiver] += treasuryFee;
-          // }
-          // if (_sellBurnFee > 0) {
-          //   uint256 burnFee = (amount * _sellBurnFee) / 100;
-          //   fee += burnFee;
-          //   _balances[DEAD] += burnFee;
-          //   //Or we can burn directly from supply, comment above and uncomment below
-          //   //_totalSupply -= burnFee;
-          // }
           if (getTotalSellFees() > 0) {
             fee = (amount * getTotalSellFees()) / 100;
             _balances[address(prismaDividendTracker)] += fee;
@@ -286,13 +254,12 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
               uint256 sellBurn = (fee * _sellBurnFee) / getTotalSellFees();
               _balances[DEAD] += sellBurn;
             }
+            if (overMinSwapFees) {
+              _isInternalTransaction = true;
+              prismaDividendTracker.swapFees();
+              _isInternalTransaction = false;
+            }
           }
-        }
-
-        if (overMinSwapFees) {
-          _isInternalTransaction = true;
-          prismaDividendTracker.swapFees();
-          _isInternalTransaction = false;
         }
       } else {
         // Token Transfer
@@ -305,7 +272,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
     uint256 amountReceived = amount - fee;
     unchecked {
-      _balances[from] = fromBalance - amount; // from will deduct full amount not the amountReceived
+      _balances[from] = fromBalance - amount;
       // Overflow not possible: the sum of all balances is capped by totalSupply, and the sum is preserved by
       // decrementing then incrementing.
       _balances[to] += amountReceived;
@@ -324,17 +291,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   ////////////
 
   /**
-   * @dev Stake given `_amount` of Prisma Token.
-   *
-   * To check:
-   *
-   * - Check for security issue and any attack.
-   * - Make sure user can not sell/transfer the staked token.
-   * - Do we need any event fired for future case?.
-   * - Check `_minStakeAmount` before deployemnt and discuss with team.
-   * - Do we need extra admin function to manage staking?
-   * - Check if we used require statement correctly? Do we need more?
-   * - Do we need maxAmount restrication as well?
+   * @dev Stake given `_amount` of Prisma Token
    */
   function stakePrisma(uint256 _amount) external {
     require(_stakingEnabled, "Staking is paused");
@@ -354,16 +311,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   }
 
   /**
-   * @dev Unstake given `_amount` of Prisma Token.
-   *
-   * To check:
-   *
-   * - Check for security issue and any attack.
-   * - Do we need any event fired for future case?.
-   * - Do we need `_minStakeAmount` constraint here too?
-   * - Do we need extra admin function to manage unstaking?
-   * - Check if we used require statement correctly? Do we need more?
-   * - Do we need maxAmount restrication as well?
+   * @dev Unstake given `_amount` of Prisma Token
    */
   function unstakePrisma(uint256 _amount) external {
     require(_stakingEnabled, "Staking is paused");

@@ -103,7 +103,7 @@ describe("PrismaV1 Test", () => {
     })
     it("cannot be reinizialized", async () => {
       await expect(
-        prismaToken.init(busd.address, tracker.address)
+        prismaToken.init(busd.address, tracker.address, this.router.address)
       ).to.be.revertedWith("Initializable: contract is already initialized")
     })
     it("has liquidity", async () => {
@@ -119,6 +119,7 @@ describe("PrismaV1 Test", () => {
       await busd.approve(this.router.address, amountIn)
       const prismaBalanceBefore = await prismaToken.balanceOf(deployer.address)
       const busdBalanceBefore = await busd.balanceOf(deployer.address)
+      const trackerBalanceBefore = await prismaToken.balanceOf(tracker.address)
       const [, amountOutB] = await this.router.getAmountsOut(amountIn, path)
       await this.router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
         amountIn,
@@ -129,9 +130,10 @@ describe("PrismaV1 Test", () => {
       )
       const prismaBalanceAfter = await prismaToken.balanceOf(deployer.address)
       const busdBalanceAfter = await busd.balanceOf(deployer.address)
+      const trackerBalanceAfter = await prismaToken.balanceOf(tracker.address)
       const buyFee = await prismaToken.getTotalBuyFees()
-      const taxedAmountOut =
-        (BigInt(100 - buyFee) * BigInt(amountOutB)) / BigInt(100)
+      const amountOutTax = (BigInt(amountOutB) * BigInt(buyFee)) / BigInt(100)
+      const taxedAmountOut = BigInt(amountOutB) - BigInt(amountOutTax)
       assert.equal(
         BigInt(prismaBalanceAfter) / BigInt(10 ** 18),
         BigInt(prismaBalanceBefore) / BigInt(10 ** 18) +
@@ -142,6 +144,11 @@ describe("PrismaV1 Test", () => {
         BigInt(busdBalanceBefore) / BigInt(10 ** 18) -
           BigInt(amountIn) / BigInt(10 ** 18)
       )
+      assert.equal(
+        BigInt(trackerBalanceAfter) / BigInt(10 ** 18),
+        BigInt(trackerBalanceBefore) / BigInt(10 ** 18) +
+          BigInt(amountOutTax) / BigInt(10 ** 18)
+      )
     })
     it("sell orders are taxed correctly", async () => {
       const amountIn = ethers.utils.parseEther("1000000")
@@ -149,9 +156,10 @@ describe("PrismaV1 Test", () => {
       await prismaToken.approve(this.router.address, amountIn)
       const prismaBalanceBefore = await prismaToken.balanceOf(deployer.address)
       const busdBalanceBefore = await busd.balanceOf(deployer.address)
+      const trackerBalanceBefore = await prismaToken.balanceOf(tracker.address)
       const sellFee = await prismaToken.getTotalSellFees()
-      const taxedAmountIn =
-        (BigInt(100 - sellFee) * BigInt(amountIn)) / BigInt(100)
+      const amountInTax = (BigInt(amountIn) * BigInt(sellFee)) / BigInt(100)
+      const taxedAmountIn = BigInt(amountIn) - BigInt(amountInTax)
       const [, amountOutB] = await this.router.getAmountsOut(
         taxedAmountIn,
         path
@@ -165,18 +173,13 @@ describe("PrismaV1 Test", () => {
       )
       const prismaBalanceAfter = await prismaToken.balanceOf(deployer.address)
       const busdBalanceAfter = await busd.balanceOf(deployer.address)
+      const trackerBalanceAfter = await prismaToken.balanceOf(tracker.address)
       await this.router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
         amountIn,
         0,
         path,
         deployer.address,
         (await ethers.provider.getBlock()).timestamp + 100
-      )
-      console.log(
-        BigInt(await busd.balanceOf(treasury.address)) / BigInt(10 ** 18)
-      )
-      console.log(
-        BigInt(await busd.balanceOf(tracker.address)) / BigInt(10 ** 18)
       )
       assert.equal(
         BigInt(busdBalanceAfter) / BigInt(10 ** 18),
@@ -188,6 +191,12 @@ describe("PrismaV1 Test", () => {
         BigInt(prismaBalanceBefore) / BigInt(10 ** 18) -
           BigInt(amountIn) / BigInt(10 ** 18)
       )
+      assert.equal(
+        BigInt(trackerBalanceAfter) / BigInt(10 ** 18),
+        BigInt(trackerBalanceBefore) / BigInt(10 ** 18) +
+          BigInt(amountInTax) / BigInt(10 ** 18)
+      )
+      assert(BigInt(await busd.balanceOf(treasury.address)) > 0n)
     })
     it("normal transfers are not taxed", async () => {
       await prismaToken.transfer(user.address, ethers.utils.parseEther("10000"))
