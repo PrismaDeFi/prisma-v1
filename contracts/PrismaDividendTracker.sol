@@ -174,13 +174,11 @@ contract PrismaDividendTracker is
   }
 
   /**
-   * @dev This is only intented for test environment, since Uniswap does not allow setting
-   * the recipient of a swap as one of the tokens being swapped, making it impossible to
-   * collect the swapped fees directly in the main contract. However, this limitation does
-   * not exist when swapping for the chain's native token, which will be our case in prod.
+   * @dev Since Uniswap does not allow setting the recipient of a swap as one of the tokens
+   * being swapped, it is impossible to collect the swapped fees directly in the main contract.
    */
 
-  function swapFees() external {
+  function swapFees() external onlyOwner {
     uint256 balanceBefore = ERC20Upgradeable(_dividendToken).balanceOf(
       address(this)
     );
