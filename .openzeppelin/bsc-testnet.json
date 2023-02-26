@@ -1,0 +1,983 @@
+{
+  "manifestVersion": "3.2",
+  "admin": {
+    "address": "0x3F75071B89BcF4dfcB747A9eEb56544202ec1b02",
+    "txHash": "0x43c55322298194d30da7f23f777c94383760d98292caf29c8b6a32cdd57828ef"
+  },
+  "proxies": [
+    {
+      "address": "0xB7ED90F0BE22c7942133404474c7c41199C08a2D",
+      "txHash": "0x0e1fbe4970f5c5761a6d298e3717a9eca5f14341a58915f71f63a630d3a21e5b",
+      "kind": "transparent"
+    },
+    {
+      "address": "0x06B2B3D1B21fEe64FFfB8251d43FbB14B2FB63Ac",
+      "txHash": "0x923c3e4a48d0874ab9d35c6a8c7f6e761c73568fb4b5be91faa03ed67c8556d5",
+      "kind": "transparent"
+    }
+  ],
+  "impls": {
+    "559a69f2f400053b06f69eda6bb271f712e4f201e354ba59eed480d2a58a635f": {
+      "address": "0xdb5DD2b000E0D89Ca806c83c0c60AF8FE2ab4e45",
+      "txHash": "0xdb4ae9d155f734a4122d6d00cf6d609dcbf21f2ec46b12becf8520469e051816",
+      "layout": {
+        "solcVersion": "0.8.17",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "_balances",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:37"
+          },
+          {
+            "label": "_allowances",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:39"
+          },
+          {
+            "label": "_totalSupply",
+            "offset": 0,
+            "slot": "53",
+            "type": "t_uint256",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:41"
+          },
+          {
+            "label": "_name",
+            "offset": 0,
+            "slot": "54",
+            "type": "t_string_storage",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:43"
+          },
+          {
+            "label": "_symbol",
+            "offset": 0,
+            "slot": "55",
+            "type": "t_string_storage",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:44"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "56",
+            "type": "t_array(t_uint256)45_storage",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:400"
+          },
+          {
+            "label": "_owner",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_address",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:22"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:94"
+          },
+          {
+            "label": "_prismaDividendTracker",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_contract(IPrismaDividendTracker)1855",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:27"
+          },
+          {
+            "label": "_multisig",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_address",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:29"
+          },
+          {
+            "label": "_liquidityReceiver",
+            "offset": 0,
+            "slot": "153",
+            "type": "t_address",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:30"
+          },
+          {
+            "label": "_treasuryReceiver",
+            "offset": 0,
+            "slot": "154",
+            "type": "t_address",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:31"
+          },
+          {
+            "label": "_burnReceiver",
+            "offset": 0,
+            "slot": "155",
+            "type": "t_address",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:32"
+          },
+          {
+            "label": "_prismaDividendToken",
+            "offset": 0,
+            "slot": "156",
+            "type": "t_address",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:33"
+          },
+          {
+            "label": "_balances",
+            "offset": 0,
+            "slot": "157",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:35"
+          },
+          {
+            "label": "_allowances",
+            "offset": 0,
+            "slot": "158",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:36"
+          },
+          {
+            "label": "_isFeeExempt",
+            "offset": 0,
+            "slot": "159",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:37"
+          },
+          {
+            "label": "_automatedMarketMakerPairs",
+            "offset": 0,
+            "slot": "160",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:38"
+          },
+          {
+            "label": "_stakedPrisma",
+            "offset": 0,
+            "slot": "161",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:39"
+          },
+          {
+            "label": "_isInternalTransaction",
+            "offset": 0,
+            "slot": "162",
+            "type": "t_bool",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:41"
+          },
+          {
+            "label": "_stakingEnabled",
+            "offset": 1,
+            "slot": "162",
+            "type": "t_bool",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:42"
+          },
+          {
+            "label": "_totalSupply",
+            "offset": 0,
+            "slot": "163",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:44"
+          },
+          {
+            "label": "_buyLiquidityFee",
+            "offset": 0,
+            "slot": "164",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:45"
+          },
+          {
+            "label": "_buyTreasuryFee",
+            "offset": 0,
+            "slot": "165",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:46"
+          },
+          {
+            "label": "_buyBurnFee",
+            "offset": 0,
+            "slot": "166",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:47"
+          },
+          {
+            "label": "_sellLiquidityFee",
+            "offset": 0,
+            "slot": "167",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:48"
+          },
+          {
+            "label": "_sellTreasuryFee",
+            "offset": 0,
+            "slot": "168",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:49"
+          },
+          {
+            "label": "_sellBurnFee",
+            "offset": 0,
+            "slot": "169",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:50"
+          },
+          {
+            "label": "_totalStakedAmount",
+            "offset": 0,
+            "slot": "170",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:51"
+          },
+          {
+            "label": "_minSwapFees",
+            "offset": 0,
+            "slot": "171",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:52"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_uint256)45_storage": {
+            "label": "uint256[45]",
+            "numberOfBytes": "1440"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(IPrismaDividendTracker)1855": {
+            "label": "contract IPrismaDividendTracker",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(address => mapping(address => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        }
+      }
+    },
+    "4dcc6a8fa2475bacf2fd331649615350309cf145222d3b49cc9b10e7871d1004": {
+      "address": "0xb9Efe791D41f3fa1077B3a3F87cb9cC88bd46B2C",
+      "txHash": "0x34bf02f239e860989942f863b04cc737ea478e862b8e08198ad10cf2d0f8a094",
+      "layout": {
+        "solcVersion": "0.8.17",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "_balances",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:37"
+          },
+          {
+            "label": "_allowances",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:39"
+          },
+          {
+            "label": "_totalSupply",
+            "offset": 0,
+            "slot": "53",
+            "type": "t_uint256",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:41"
+          },
+          {
+            "label": "_name",
+            "offset": 0,
+            "slot": "54",
+            "type": "t_string_storage",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:43"
+          },
+          {
+            "label": "_symbol",
+            "offset": 0,
+            "slot": "55",
+            "type": "t_string_storage",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:44"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "56",
+            "type": "t_array(t_uint256)45_storage",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:400"
+          },
+          {
+            "label": "_owner",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_address",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:22"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:94"
+          },
+          {
+            "label": "_tokenHoldersMap",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_struct(Map)2235_storage",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:21"
+          },
+          {
+            "label": "_magnifiedPrismaPerShare",
+            "offset": 0,
+            "slot": "155",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:32"
+          },
+          {
+            "label": "_magnifiedDividendPerShare",
+            "offset": 0,
+            "slot": "156",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:33"
+          },
+          {
+            "label": "_lastProcessedIndex",
+            "offset": 0,
+            "slot": "157",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:34"
+          },
+          {
+            "label": "_minimumTokenBalanceForDividends",
+            "offset": 0,
+            "slot": "158",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:35"
+          },
+          {
+            "label": "_gasForProcessing",
+            "offset": 0,
+            "slot": "159",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:36"
+          },
+          {
+            "label": "_totalDividendsDistributed",
+            "offset": 0,
+            "slot": "160",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:37"
+          },
+          {
+            "label": "_processingAutoReinvest",
+            "offset": 0,
+            "slot": "161",
+            "type": "t_bool",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:38"
+          },
+          {
+            "label": "_magnifiedDividendCorrections",
+            "offset": 0,
+            "slot": "162",
+            "type": "t_mapping(t_address,t_int256)",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:53"
+          },
+          {
+            "label": "_withdrawnDividends",
+            "offset": 0,
+            "slot": "163",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:54"
+          },
+          {
+            "label": "_excludedFromDividends",
+            "offset": 0,
+            "slot": "164",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:55"
+          },
+          {
+            "label": "_prisma",
+            "offset": 0,
+            "slot": "165",
+            "type": "t_contract(IPrismaToken)2217",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:57"
+          },
+          {
+            "label": "_router",
+            "offset": 0,
+            "slot": "166",
+            "type": "t_contract(IUniswapV2Router02)2042",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:58"
+          },
+          {
+            "label": "_pair",
+            "offset": 0,
+            "slot": "167",
+            "type": "t_address",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:59"
+          },
+          {
+            "label": "_dividendToken",
+            "offset": 0,
+            "slot": "168",
+            "type": "t_address",
+            "contract": "ALPHA_PrismaDividendTracker",
+            "src": "contracts/PrismaDividendTracker.sol:60"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_address)dyn_storage": {
+            "label": "address[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)45_storage": {
+            "label": "uint256[45]",
+            "numberOfBytes": "1440"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(IPrismaToken)2217": {
+            "label": "contract IPrismaToken",
+            "numberOfBytes": "20"
+          },
+          "t_contract(IUniswapV2Router02)2042": {
+            "label": "contract IUniswapV2Router02",
+            "numberOfBytes": "20"
+          },
+          "t_int256": {
+            "label": "int256",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_int256)": {
+            "label": "mapping(address => int256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(address => mapping(address => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Map)2235_storage": {
+            "label": "struct IterableMapping.Map",
+            "members": [
+              {
+                "label": "keys",
+                "type": "t_array(t_address)dyn_storage",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "values",
+                "type": "t_mapping(t_address,t_uint256)",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "indexOf",
+                "type": "t_mapping(t_address,t_uint256)",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "inserted",
+                "type": "t_mapping(t_address,t_bool)",
+                "offset": 0,
+                "slot": "3"
+              }
+            ],
+            "numberOfBytes": "128"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        }
+      }
+    },
+    "11b58a6e447d7258c9698981c0d7ef890108ea21987de02fe327423046505b99": {
+      "address": "0x06d27e8fC8396c060c7CCa1cFC4A3eaA2F638c8b",
+      "txHash": "0x6fd123ed0f3aafecd7a2f199d20f14cc67dc6262c161d1505b3df51bf30947ed",
+      "layout": {
+        "solcVersion": "0.8.17",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:62",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:67"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:36"
+          },
+          {
+            "label": "_balances",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:37"
+          },
+          {
+            "label": "_allowances",
+            "offset": 0,
+            "slot": "52",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:39"
+          },
+          {
+            "label": "_totalSupply",
+            "offset": 0,
+            "slot": "53",
+            "type": "t_uint256",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:41"
+          },
+          {
+            "label": "_name",
+            "offset": 0,
+            "slot": "54",
+            "type": "t_string_storage",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:43"
+          },
+          {
+            "label": "_symbol",
+            "offset": 0,
+            "slot": "55",
+            "type": "t_string_storage",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:44"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "56",
+            "type": "t_array(t_uint256)45_storage",
+            "contract": "ERC20Upgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol:400"
+          },
+          {
+            "label": "_owner",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_address",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:22"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "102",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:94"
+          },
+          {
+            "label": "_prismaDividendTracker",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_contract(IPrismaDividendTracker)1855",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:27"
+          },
+          {
+            "label": "_multisig",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_address",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:29"
+          },
+          {
+            "label": "_liquidityReceiver",
+            "offset": 0,
+            "slot": "153",
+            "type": "t_address",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:30"
+          },
+          {
+            "label": "_treasuryReceiver",
+            "offset": 0,
+            "slot": "154",
+            "type": "t_address",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:31"
+          },
+          {
+            "label": "_burnReceiver",
+            "offset": 0,
+            "slot": "155",
+            "type": "t_address",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:32"
+          },
+          {
+            "label": "_prismaDividendToken",
+            "offset": 0,
+            "slot": "156",
+            "type": "t_address",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:33"
+          },
+          {
+            "label": "_balances",
+            "offset": 0,
+            "slot": "157",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:35"
+          },
+          {
+            "label": "_allowances",
+            "offset": 0,
+            "slot": "158",
+            "type": "t_mapping(t_address,t_mapping(t_address,t_uint256))",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:36"
+          },
+          {
+            "label": "_isFeeExempt",
+            "offset": 0,
+            "slot": "159",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:37"
+          },
+          {
+            "label": "_automatedMarketMakerPairs",
+            "offset": 0,
+            "slot": "160",
+            "type": "t_mapping(t_address,t_bool)",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:38"
+          },
+          {
+            "label": "_stakedPrisma",
+            "offset": 0,
+            "slot": "161",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:39"
+          },
+          {
+            "label": "_isInternalTransaction",
+            "offset": 0,
+            "slot": "162",
+            "type": "t_bool",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:41"
+          },
+          {
+            "label": "_stakingEnabled",
+            "offset": 1,
+            "slot": "162",
+            "type": "t_bool",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:42"
+          },
+          {
+            "label": "_totalSupply",
+            "offset": 0,
+            "slot": "163",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:44"
+          },
+          {
+            "label": "_buyLiquidityFee",
+            "offset": 0,
+            "slot": "164",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:45"
+          },
+          {
+            "label": "_buyTreasuryFee",
+            "offset": 0,
+            "slot": "165",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:46"
+          },
+          {
+            "label": "_buyBurnFee",
+            "offset": 0,
+            "slot": "166",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:47"
+          },
+          {
+            "label": "_sellLiquidityFee",
+            "offset": 0,
+            "slot": "167",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:48"
+          },
+          {
+            "label": "_sellTreasuryFee",
+            "offset": 0,
+            "slot": "168",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:49"
+          },
+          {
+            "label": "_sellBurnFee",
+            "offset": 0,
+            "slot": "169",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:50"
+          },
+          {
+            "label": "_totalStakedAmount",
+            "offset": 0,
+            "slot": "170",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:51"
+          },
+          {
+            "label": "_minSwapFees",
+            "offset": 0,
+            "slot": "171",
+            "type": "t_uint256",
+            "contract": "ALPHA_PrismaToken",
+            "src": "contracts/PrismaToken.sol:52"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_uint256)45_storage": {
+            "label": "uint256[45]",
+            "numberOfBytes": "1440"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_contract(IPrismaDividendTracker)1855": {
+            "label": "contract IPrismaDividendTracker",
+            "numberOfBytes": "20"
+          },
+          "t_mapping(t_address,t_bool)": {
+            "label": "mapping(address => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_address,t_uint256))": {
+            "label": "mapping(address => mapping(address => uint256))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        }
+      }
+    }
+  }
+}

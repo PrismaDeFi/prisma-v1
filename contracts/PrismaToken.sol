@@ -8,7 +8,11 @@ import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "./IPrismaToken.sol";
 import "./IPrismaDividendTracker.sol";
 
-contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
+contract ALPHA_PrismaToken is
+  IPrismaToken,
+  ERC20Upgradeable,
+  OwnableUpgradeable
+{
   ///////////////
   // CONSTANTS //
   ///////////////
@@ -45,7 +49,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   uint256 private _sellTreasuryFee;
   uint256 private _sellBurnFee;
   uint256 private _totalStakedAmount;
-  uint256 private _minSwapFees = 10_000 * 10 ** 18;
+  uint256 private _minSwapFees;
 
   ////////////
   // Events //
@@ -75,10 +79,18 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     __Ownable_init();
     __ERC20_init("Prisma Finance", "PRISMA");
 
-    _liquidityReceiver = 0x90F79bf6EB2c4f870365E785982E1f101E93b906; // development wallet
-    _treasuryReceiver = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65; // development wallet
-    _multisig = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; // development wallet
+    // LOCAL TESTNET ONLY
+    // _liquidityReceiver = 0x90F79bf6EB2c4f870365E785982E1f101E93b906;
+    // _treasuryReceiver = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65;
+    // _multisig = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
+
+    // PUBLIC TESTNET ONLY
+    _liquidityReceiver = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
+    _treasuryReceiver = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
+    _multisig = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
+
     _totalSupply = 100_000_000 * (10 ** 18);
+    _minSwapFees = 10_000 * 10 ** 18;
     _buyLiquidityFee = 2;
     _buyTreasuryFee = 2;
     _sellLiquidityFee = 2;

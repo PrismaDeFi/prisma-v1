@@ -11,7 +11,7 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
-contract PrismaDividendTracker is
+contract ALPHA_PrismaDividendTracker is
   IPrismaDividendTracker,
   ERC20Upgradeable,
   OwnableUpgradeable
@@ -33,7 +33,7 @@ contract PrismaDividendTracker is
   uint256 private _magnifiedDividendPerShare;
   uint256 private _lastProcessedIndex;
   uint256 private _minimumTokenBalanceForDividends;
-  uint256 private _gasForProcessing = 10_000_000;
+  uint256 private _gasForProcessing;
   uint256 private _totalDividendsDistributed;
   bool private _processingAutoReinvest;
 
@@ -104,6 +104,7 @@ contract PrismaDividendTracker is
     );
 
     _minimumTokenBalanceForDividends = 1000 * (10 ** 18);
+    _gasForProcessing = 10_000_000;
   }
 
   ///////////

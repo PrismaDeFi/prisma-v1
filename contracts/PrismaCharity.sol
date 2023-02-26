@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/interfaces/IERC20.sol";
 
 contract PrismaCharity is Ownable {
-  address private prismaProxy = address(0x0); // placeholder
+  address private prismaProxy = 0xB7ED90F0BE22c7942133404474c7c41199C08a2D;
 
   function retrieveERC20(
     address token,
