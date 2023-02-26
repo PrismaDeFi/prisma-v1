@@ -18,7 +18,7 @@ contract PrismaDividendTracker is
 {
   using IterableMapping for IterableMapping.Map;
 
-  IterableMapping.Map private tokenHoldersMap;
+  IterableMapping.Map private _tokenHoldersMap;
 
   ///////////////
   // VARIABLES //
@@ -27,14 +27,14 @@ contract PrismaDividendTracker is
   /**
    * @dev With `magnitude`, we can properly distribute dividends even if the amount of received ether is small.
    */
-  uint256 private constant magnitude = 2 ** 128;
+  uint256 private constant _magnitude = 2 ** 128;
 
   uint256 private _magnifiedPrismaPerShare;
-  uint256 private magnifiedDividendPerShare;
-  uint256 private lastProcessedIndex;
-  uint256 private minimumTokenBalanceForDividends;
-  uint256 private gasForProcessing = 10_000_000;
-  uint256 private totalDividendsDistributed;
+  uint256 private _magnifiedDividendPerShare;
+  uint256 private _lastProcessedIndex;
+  uint256 private _minimumTokenBalanceForDividends;
+  uint256 private _gasForProcessing = 10_000_000;
+  uint256 private _totalDividendsDistributed;
   bool private _processingAutoReinvest;
 
   /**
@@ -50,14 +50,14 @@ contract PrismaDividendTracker is
    *   `dividendCorrectionOf(_user) = dividendPerShare * (old balanceOf(_user)) - (new balanceOf(_user))`.
    * So now `dividendOf(_user)` returns the same value before and after `balanceOf(_user)` is changed.
    */
-  mapping(address => int256) private magnifiedDividendCorrections;
-  mapping(address => uint256) private withdrawnDividends;
-  mapping(address => bool) private excludedFromDividends;
+  mapping(address => int256) private _magnifiedDividendCorrections;
+  mapping(address => uint256) private _withdrawnDividends;
+  mapping(address => bool) private _excludedFromDividends;
 
-  IPrismaToken private prisma;
-  IUniswapV2Router02 private router;
-  address private pair;
-  address private dividendToken;
+  IPrismaToken private _prisma;
+  IUniswapV2Router02 private _router;
+  address private _pair;
+  address private _dividendToken;
 
   ////////////
   // Events //
@@ -89,21 +89,21 @@ contract PrismaDividendTracker is
    * @dev Sets minimum wait between dividend claims and minimum balance to be eligible
    */
   function init(
-    address _dividentToken,
-    address _router,
-    address _prisma
+    address dividendToken_,
+    address router_,
+    address prisma_
   ) public initializer {
     __Ownable_init();
     __ERC20_init("Prisma Tracker", "PRISMA_TRACKER");
-    dividendToken = _dividentToken;
-    prisma = IPrismaToken(_prisma);
-    router = IUniswapV2Router02(_router);
-    pair = IUniswapV2Factory(router.factory()).createPair(
-      _prisma,
-      _dividentToken
+    _dividendToken = dividendToken_;
+    _prisma = IPrismaToken(prisma_);
+    _router = IUniswapV2Router02(router_);
+    _pair = IUniswapV2Factory(_router.factory()).createPair(
+      prisma_,
+      _dividendToken
     );
 
-    minimumTokenBalanceForDividends = 1000 * (10 ** 18);
+    _minimumTokenBalanceForDividends = 1000 * (10 ** 18);
   }
 
   ///////////
@@ -136,12 +136,12 @@ contract PrismaDividendTracker is
     require(false); // currently disabled
     super._transfer(from, to, value);
 
-    int256 _magCorrection = int(magnifiedDividendPerShare * value);
-    magnifiedDividendCorrections[from] =
-      magnifiedDividendCorrections[from] +
+    int256 _magCorrection = int(_magnifiedDividendPerShare * value);
+    _magnifiedDividendCorrections[from] =
+      _magnifiedDividendCorrections[from] +
       _magCorrection;
-    magnifiedDividendCorrections[to] =
-      magnifiedDividendCorrections[to] -
+    _magnifiedDividendCorrections[to] =
+      _magnifiedDividendCorrections[to] -
       _magCorrection;
   }
 
@@ -154,9 +154,9 @@ contract PrismaDividendTracker is
   function _mint(address account, uint256 value) internal override {
     super._mint(account, value);
 
-    magnifiedDividendCorrections[account] =
-      magnifiedDividendCorrections[account] -
-      int(magnifiedDividendPerShare * value);
+    _magnifiedDividendCorrections[account] =
+      _magnifiedDividendCorrections[account] -
+      int(_magnifiedDividendPerShare * value);
   }
 
   /**
@@ -168,9 +168,9 @@ contract PrismaDividendTracker is
   function _burn(address account, uint256 value) internal override {
     super._burn(account, value);
 
-    magnifiedDividendCorrections[account] =
-      magnifiedDividendCorrections[account] +
-      int(magnifiedDividendPerShare * value);
+    _magnifiedDividendCorrections[account] =
+      _magnifiedDividendCorrections[account] +
+      int(_magnifiedDividendPerShare * value);
   }
 
   /**
@@ -181,27 +181,29 @@ contract PrismaDividendTracker is
    */
 
   function swapFees() external {
-    uint256 balanceBefore = ERC20Upgradeable(dividendToken).balanceOf(
+    uint256 balanceBefore = ERC20Upgradeable(_dividendToken).balanceOf(
       address(this)
     );
 
-    uint256 balance = prisma.balanceOf(address(this));
-    uint256 liquidityFee = (prisma.getSellLiquidityFee() * balance) / 100;
-    uint256 burnFee = (prisma.getSellBurnFee() * balance) / 100;
+    uint256 balance = ERC20Upgradeable(address(_prisma)).balanceOf(
+      address(this)
+    );
+    uint256 liquidityFee = (_prisma.getSellLiquidityFee() * balance) / 100;
+    uint256 burnFee = (_prisma.getSellBurnFee() * balance) / 100;
     uint256 swapAmount = balance - liquidityFee - burnFee;
 
-    ERC20Upgradeable(address(prisma)).approve(address(router), swapAmount);
+    ERC20Upgradeable(address(_prisma)).approve(address(_router), swapAmount);
     address[] memory path = new address[](2);
-    path[0] = address(prisma);
-    path[1] = dividendToken;
-    router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+    path[0] = address(_prisma);
+    path[1] = _dividendToken;
+    _router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
       swapAmount,
       0,
       path,
       address(this),
       block.timestamp
     );
-    uint256 balanceAfter = ERC20Upgradeable(dividendToken).balanceOf(
+    uint256 balanceAfter = ERC20Upgradeable(_dividendToken).balanceOf(
       address(this)
     );
     uint256 collectedFees = balanceAfter - balanceBefore;
@@ -210,17 +212,20 @@ contract PrismaDividendTracker is
       super._transfer(address(this), address(0x0), burnFee);
     }
 
-    uint256 liquidityBNB = (collectedFees * (prisma.getSellLiquidityFee())) /
-      (prisma.getTotalSellFees());
+    uint256 liquidityBNB = (collectedFees * (_prisma.getSellLiquidityFee())) /
+      (_prisma.getTotalSellFees());
     if (liquidityBNB > 5) {
-      ERC20Upgradeable(address(prisma)).approve(address(router), liquidityFee);
-      ERC20Upgradeable(address(dividendToken)).approve(
-        address(router),
+      ERC20Upgradeable(address(_prisma)).approve(
+        address(_router),
+        liquidityFee
+      );
+      ERC20Upgradeable(address(_dividendToken)).approve(
+        address(_router),
         liquidityBNB
       );
-      (, uint256 amountB, ) = router.addLiquidity(
-        address(prisma),
-        dividendToken,
+      (, uint256 amountB, ) = _router.addLiquidity(
+        address(_prisma),
+        _dividendToken,
         liquidityFee,
         liquidityBNB,
         0,
@@ -232,9 +237,12 @@ contract PrismaDividendTracker is
     }
 
     if (burnFee > 0) {
-      uint256 burnBNB = (collectedFees * (prisma.getSellBurnFee())) /
-        (prisma.getTotalSellFees());
-      ERC20Upgradeable(dividendToken).transfer(prisma.getBurn(), burnBNB);
+      uint256 burnBNB = (collectedFees * (_prisma.getSellBurnFee())) /
+        (_prisma.getTotalSellFees());
+      ERC20Upgradeable(_dividendToken).transfer(
+        _prisma.getBurnReceiver(),
+        burnBNB
+      );
       // (bool success_, ) = address(burnReceiver).call{value: burnBNB}("");
       // if (success_) {
       //   emit BurnFeeCollected(burnBNB);
@@ -242,10 +250,13 @@ contract PrismaDividendTracker is
       collectedFees -= burnBNB;
     }
 
-    // uint256 treasuryBNB = (collectedFees * (prisma.getSellTreasuryFee())) /
-    //   (prisma.getTotalSellFees());
+    // uint256 treasuryBNB = (collectedFees * (_prisma.getSellTreasuryFee())) /
+    //   (_prisma.getTotalSellFees());
     uint256 treasuryBNB = collectedFees;
-    ERC20Upgradeable(dividendToken).transfer(prisma.getTreasury(), treasuryBNB);
+    ERC20Upgradeable(_dividendToken).transfer(
+      _prisma.getTreasuryReceiver(),
+      treasuryBNB
+    );
     // (bool _success, ) = address(treasuryReceiver).call{value: treasuryBNB}("");
     // if (_success) {
     //   emit TreasuryFeeCollected(treasuryBNB);
@@ -259,20 +270,17 @@ contract PrismaDividendTracker is
   /**
    * @notice Updates the holders struct
    */
-  function setBalance(
-    address payable account,
-    uint256 newBalance
-  ) external onlyOwner {
-    if (excludedFromDividends[account]) {
+  function setBalance(address account, uint256 newBalance) external onlyOwner {
+    if (_excludedFromDividends[account]) {
       return;
     }
 
-    if (newBalance >= minimumTokenBalanceForDividends) {
+    if (newBalance >= _minimumTokenBalanceForDividends) {
       _setBalance(account, newBalance);
-      tokenHoldersMap.set(account, newBalance);
+      _tokenHoldersMap.set(account, newBalance);
     } else {
       _setBalance(account, 0);
-      tokenHoldersMap.remove(account);
+      _tokenHoldersMap.remove(account);
     }
   }
 
@@ -308,22 +316,22 @@ contract PrismaDividendTracker is
    * !!! onlyOwner modifier temporarily removed - to check whether it is needed !!!
    */
   function distributeDividends(bool processDividends) external {
-    // require(msg.sender == prisma.getMultisig(), "Not multisig");
+    // require(msg.sender == _prisma.getMultisig(), "Not multisig");
     require(totalSupply() > 0);
 
-    uint256 amount = ERC20Upgradeable(dividendToken).balanceOf(address(this));
+    uint256 amount = ERC20Upgradeable(_dividendToken).balanceOf(address(this));
     if (amount > 0) {
-      magnifiedDividendPerShare =
-        magnifiedDividendPerShare +
-        (amount * magnitude) /
+      _magnifiedDividendPerShare =
+        _magnifiedDividendPerShare +
+        (amount * _magnitude) /
         totalSupply();
 
       emit DividendsDistributed(msg.sender, amount);
 
-      totalDividendsDistributed = totalDividendsDistributed + amount;
+      _totalDividendsDistributed = _totalDividendsDistributed + amount;
 
       if (processDividends) {
-        process(gasForProcessing, false);
+        process(_gasForProcessing, false);
         autoReinvest();
       }
     }
@@ -341,13 +349,13 @@ contract PrismaDividendTracker is
     uint256 gas,
     bool reinvesting
   ) public returns (uint256, uint256, uint256) {
-    uint256 numberOfTokenHolders = tokenHoldersMap.keys.length;
+    uint256 numberOfTokenHolders = _tokenHoldersMap.keys.length;
 
     if (numberOfTokenHolders == 0) {
-      return (0, 0, lastProcessedIndex);
+      return (0, 0, _lastProcessedIndex);
     }
 
-    uint256 _lastProcessedIndex = lastProcessedIndex;
+    uint256 lastProcessedIndex = _lastProcessedIndex;
 
     uint256 gasUsed = 0;
 
@@ -357,13 +365,13 @@ contract PrismaDividendTracker is
     uint256 claims = 0;
 
     while (gasUsed < gas && iterations < numberOfTokenHolders) {
-      _lastProcessedIndex++;
+      lastProcessedIndex++;
 
-      if (_lastProcessedIndex >= tokenHoldersMap.keys.length) {
-        _lastProcessedIndex = 0;
+      if (lastProcessedIndex >= _tokenHoldersMap.keys.length) {
+        lastProcessedIndex = 0;
       }
 
-      address account = tokenHoldersMap.keys[_lastProcessedIndex];
+      address account = _tokenHoldersMap.keys[lastProcessedIndex];
 
       if (reinvesting) {
         if (processReinvest(account, true)) {
@@ -384,9 +392,9 @@ contract PrismaDividendTracker is
       gasLeft = newGasLeft;
     }
 
-    lastProcessedIndex = _lastProcessedIndex;
+    _lastProcessedIndex = lastProcessedIndex;
 
-    return (iterations, claims, lastProcessedIndex);
+    return (iterations, claims, _lastProcessedIndex);
   }
 
   /**
@@ -403,9 +411,9 @@ contract PrismaDividendTracker is
     if (amount == 0) {
       uint256 _withdrawableDividend = withdrawableDividendOf(account) -
         (withdrawableDividendOf(account) *
-          ((prisma.getStakedPrisma(account) * magnitude) /
+          ((_prisma.getStakedPrisma(account) * _magnitude) /
             balanceOf(account))) /
-        magnitude;
+        _magnitude;
       _amount = _withdrawDividendOfUser(account, _withdrawableDividend);
     } else {
       _amount = _withdrawDividendOfUser(account, amount);
@@ -431,12 +439,12 @@ contract PrismaDividendTracker is
     uint256 _withdrawableDividend = withdrawableDividendOf(user);
 
     if (_withdrawableDividend > 0 && amount <= _withdrawableDividend) {
-      withdrawnDividends[user] += amount;
+      _withdrawnDividends[user] += amount;
 
-      bool success = IERC20Upgradeable(dividendToken).transfer(user, amount);
+      bool success = IERC20Upgradeable(_dividendToken).transfer(user, amount);
 
       if (!success) {
-        withdrawnDividends[user] = withdrawnDividends[user] - amount;
+        _withdrawnDividends[user] = _withdrawnDividends[user] - amount;
         return 0;
       }
 
@@ -453,19 +461,19 @@ contract PrismaDividendTracker is
   ////////////////////////////
 
   function autoReinvest() internal {
-    uint256 _totalStakedPrisma = prisma.getTotalStakedAmount();
-    uint256 _totalUnclaimedDividend = IERC20Upgradeable(dividendToken)
+    uint256 _totalStakedPrisma = _prisma.getTotalStakedAmount();
+    uint256 _totalUnclaimedDividend = IERC20Upgradeable(_dividendToken)
       .balanceOf(address(this));
     if (_totalStakedPrisma > 10 && _totalUnclaimedDividend > 10) {
       _processingAutoReinvest = true;
-      IERC20Upgradeable(dividendToken).approve(
-        address(router),
+      IERC20Upgradeable(_dividendToken).approve(
+        address(_router),
         _totalUnclaimedDividend
       );
       address[] memory path = new address[](2);
-      path[0] = dividendToken;
-      path[1] = address(prisma);
-      router.swapExactTokensForTokens(
+      path[0] = _dividendToken;
+      path[1] = address(_prisma);
+      _router.swapExactTokensForTokens(
         _totalUnclaimedDividend,
         0,
         path,
@@ -473,9 +481,10 @@ contract PrismaDividendTracker is
         block.timestamp
       );
 
-      uint256 _contractPrismaBalance = prisma.balanceOf(address(this));
+      uint256 _contractPrismaBalance = ERC20Upgradeable(address(_prisma))
+        .balanceOf(address(this));
       _magnifiedPrismaPerShare =
-        (_contractPrismaBalance * magnitude) /
+        (_contractPrismaBalance * _magnitude) /
         _totalStakedPrisma;
 
       process(10_000_000, true);
@@ -503,9 +512,9 @@ contract PrismaDividendTracker is
     uint256 _reinvestableDividend = withdrawableDividendOf(_user);
 
     if (_reinvestableDividend > 0) {
-      withdrawnDividends[_user] += _reinvestableDividend;
+      _withdrawnDividends[_user] += _reinvestableDividend;
       uint256 _prismaToCompound = distributeEarnedPrisma(_user);
-      prisma.compoundPrisma(_user, _prismaToCompound);
+      _prisma.compoundPrisma(_user, _prismaToCompound);
       emit Reinvested(
         _user,
         _reinvestableDividend,
@@ -527,24 +536,28 @@ contract PrismaDividendTracker is
     );
     uint256 _withdrawableDividend = withdrawableDividendOf(msg.sender);
     if (_withdrawableDividend > 0 && amount <= _withdrawableDividend) {
-      uint256 balanceBefore = prisma.balanceOf(address(this));
+      uint256 balanceBefore = ERC20Upgradeable(address(_prisma)).balanceOf(
+        address(this)
+      );
 
-      withdrawnDividends[msg.sender] += amount;
-      IERC20Upgradeable(dividendToken).approve(address(router), amount);
+      _withdrawnDividends[msg.sender] += amount;
+      IERC20Upgradeable(_dividendToken).approve(address(_router), amount);
       address[] memory path = new address[](2);
-      path[0] = dividendToken;
-      path[1] = address(prisma);
-      router.swapExactTokensForTokens(
+      path[0] = _dividendToken;
+      path[1] = address(_prisma);
+      _router.swapExactTokensForTokens(
         amount,
         0,
         path,
         address(this),
         block.timestamp
       );
-      uint256 balanceAfter = prisma.balanceOf(address(this));
+      uint256 balanceAfter = ERC20Upgradeable(address(_prisma)).balanceOf(
+        address(this)
+      );
 
       uint256 _userPrisma = balanceAfter - balanceBefore;
-      prisma.compoundPrisma(msg.sender, _userPrisma);
+      _prisma.compoundPrisma(msg.sender, _userPrisma);
     }
   }
 
@@ -560,7 +573,7 @@ contract PrismaDividendTracker is
   function withdrawableDividendOf(
     address _owner
   ) public view returns (uint256) {
-    return accumulativeDividendOf(_owner) - withdrawnDividends[_owner];
+    return accumulativeDividendOf(_owner) - _withdrawnDividends[_owner];
   }
 
   /**
@@ -569,7 +582,7 @@ contract PrismaDividendTracker is
    * @return The amount of dividend in wei that `_owner` has withdrawn.
    */
   function withdrawnDividendOf(address _owner) public view returns (uint256) {
-    return withdrawnDividends[_owner];
+    return _withdrawnDividends[_owner];
   }
 
   /**
@@ -584,15 +597,15 @@ contract PrismaDividendTracker is
   ) public view returns (uint256) {
     return
       uint(
-        int(magnifiedDividendPerShare * balanceOf(_owner)) +
-          magnifiedDividendCorrections[_owner]
-      ) / magnitude;
+        int(_magnifiedDividendPerShare * balanceOf(_owner)) +
+          _magnifiedDividendCorrections[_owner]
+      ) / _magnitude;
   }
 
   function distributeEarnedPrisma(address _user) public view returns (uint256) {
-    uint256 _userStakedPrisma = prisma.getStakedPrisma(_user);
+    uint256 _userStakedPrisma = _prisma.getStakedPrisma(_user);
     uint256 _prismaDividend = (_magnifiedPrismaPerShare * _userStakedPrisma) /
-      magnitude;
+      _magnitude;
     return _prismaDividend;
   }
 
@@ -607,10 +620,10 @@ contract PrismaDividendTracker is
     uint256 _newMinimumBalance
   ) external onlyOwner {
     require(
-      _newMinimumBalance != minimumTokenBalanceForDividends,
+      _newMinimumBalance != _minimumTokenBalanceForDividends,
       "New mimimum balance for dividend cannot be same as current minimum balance"
     );
-    minimumTokenBalanceForDividends = _newMinimumBalance * (10 ** 18);
+    _minimumTokenBalanceForDividends = _newMinimumBalance * (10 ** 18);
   }
 
   /**
@@ -619,13 +632,13 @@ contract PrismaDividendTracker is
    */
   function excludeFromDividends(address account) external onlyOwner {
     require(
-      !excludedFromDividends[account],
+      !_excludedFromDividends[account],
       "address already excluded from dividends"
     );
-    excludedFromDividends[account] = true;
+    _excludedFromDividends[account] = true;
 
     _setBalance(account, 0);
-    tokenHoldersMap.remove(account);
+    _tokenHoldersMap.remove(account);
 
     emit ExcludeFromDividends(account);
   }
@@ -634,7 +647,7 @@ contract PrismaDividendTracker is
    * @notice Makes an address eligible for dividends
    */
   function includeFromDividends(address account) external onlyOwner {
-    excludedFromDividends[account] = false;
+    _excludedFromDividends[account] = false;
   }
 
   /**
@@ -642,16 +655,16 @@ contract PrismaDividendTracker is
    * @dev This should be an ERC20 token
    */
   function setDividendTokenAddress(address newToken) external onlyOwner {
-    dividendToken = newToken;
+    _dividendToken = newToken;
   }
 
   function updateGasForProcessing(uint256 newValue) external onlyOwner {
     require(
-      newValue != gasForProcessing,
+      newValue != _gasForProcessing,
       "Cannot update gasForProcessing to same value"
     );
-    gasForProcessing = newValue;
-    emit GasForProcessing_Updated(newValue, gasForProcessing);
+    _gasForProcessing = newValue;
+    emit GasForProcessing_Updated(newValue, _gasForProcessing);
   }
 
   ///////////////////////
@@ -663,7 +676,7 @@ contract PrismaDividendTracker is
    *
    */
   function getTotalDividendsDistributed() external view returns (uint256) {
-    return totalDividendsDistributed;
+    return _totalDividendsDistributed;
   }
 
   /**
@@ -671,7 +684,7 @@ contract PrismaDividendTracker is
    * @return uint256 last processed index
    */
   function getLastProcessedIndex() external view returns (uint256) {
-    return lastProcessedIndex;
+    return _lastProcessedIndex;
   }
 
   /**
@@ -679,7 +692,7 @@ contract PrismaDividendTracker is
    * @return uint256 length of `tokenHoldersMap` iterable mapping
    */
   function getNumberOfTokenHolders() external view returns (uint256) {
-    return tokenHoldersMap.keys.length;
+    return _tokenHoldersMap.keys.length;
   }
 
   /**
@@ -701,17 +714,17 @@ contract PrismaDividendTracker is
   {
     account = _account;
 
-    index = tokenHoldersMap.getIndexOfKey(account);
+    index = _tokenHoldersMap.getIndexOfKey(account);
 
     iterationsUntilProcessed = -1;
 
     if (index >= 0) {
-      if (uint256(index) > lastProcessedIndex) {
-        iterationsUntilProcessed = index - int256(lastProcessedIndex);
+      if (uint256(index) > _lastProcessedIndex) {
+        iterationsUntilProcessed = index - int256(_lastProcessedIndex);
       } else {
-        uint256 processesUntilEndOfArray = tokenHoldersMap.keys.length >
-          lastProcessedIndex
-          ? tokenHoldersMap.keys.length - lastProcessedIndex
+        uint256 processesUntilEndOfArray = _tokenHoldersMap.keys.length >
+          _lastProcessedIndex
+          ? _tokenHoldersMap.keys.length - _lastProcessedIndex
           : 0;
 
         iterationsUntilProcessed = index + int256(processesUntilEndOfArray);
@@ -729,12 +742,16 @@ contract PrismaDividendTracker is
   function getAccountAtIndex(
     uint256 index
   ) public view returns (address, int256, int256, uint256, uint256) {
-    if (index >= tokenHoldersMap.size()) {
+    if (index >= _tokenHoldersMap.size()) {
       return (0x0000000000000000000000000000000000000000, -1, -1, 0, 0);
     }
 
-    address account = tokenHoldersMap.getKeyAtIndex(index);
+    address account = _tokenHoldersMap.getKeyAtIndex(index);
 
     return getAccount(account);
+  }
+
+  function getMinBalanceForDividends() external view returns (uint256) {
+    return _minimumTokenBalanceForDividends;
   }
 }

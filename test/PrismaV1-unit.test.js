@@ -49,11 +49,7 @@ describe("PrismaV1 Test", () => {
     await this.router.deployTransaction.wait()
 
     prismaMultisig = prismaToken.connect(multisig)
-    await prismaMultisig.init(
-      busd.address,
-      tracker.address,
-      this.router.address
-    )
+    await prismaMultisig.init(busd.address, tracker.address)
     await prismaMultisig.transfer(
       deployer.address,
       ethers.utils.parseEther("100000000")
@@ -103,7 +99,7 @@ describe("PrismaV1 Test", () => {
     })
     it("cannot be reinizialized", async () => {
       await expect(
-        prismaToken.init(busd.address, tracker.address, this.router.address)
+        prismaToken.init(busd.address, tracker.address)
       ).to.be.revertedWith("Initializable: contract is already initialized")
     })
     it("has liquidity", async () => {
@@ -230,22 +226,11 @@ describe("PrismaV1 Test", () => {
         prismaToken.stakePrisma(ethers.utils.parseEther("10000"))
       ).to.be.revertedWith("Staking is paused")
     })
-    it("must be qualified", async () => {
-      await prismaToken.setNotStakingQualified(deployer.address, true)
-      await expect(
-        prismaToken.stakePrisma(ethers.utils.parseEther("10000"))
-      ).to.be.revertedWith("The address is not allowed to stake or unstake")
-    })
     it("cannot stake more tokens than owned", async () => {
       const prismaUser = prismaToken.connect(user)
       await expect(
         prismaUser.stakePrisma(ethers.utils.parseEther("10000"))
       ).to.be.revertedWith("Not enough tokens to stake")
-    })
-    it("must stake at least min amount", async () => {
-      await expect(
-        prismaToken.stakePrisma(ethers.utils.parseEther("1"))
-      ).to.be.revertedWith("Amount is less than minimum required token")
     })
     it("can stake", async () => {
       await prismaToken.stakePrisma(ethers.utils.parseEther("10000"))

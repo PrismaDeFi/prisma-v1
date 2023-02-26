@@ -20,27 +20,22 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   // VARIABLES //
   ///////////////
 
-  IPrismaDividendTracker private prismaDividendTracker;
-  IUniswapV2Router02 private _router;
+  IPrismaDividendTracker private _prismaDividendTracker;
 
-  address private multisig;
-  address private liquidityReceiver;
-  address private treasuryReceiver;
-  address private burnReceiver;
-  address private prismaDividendToken;
+  address private _multisig;
+  address private _liquidityReceiver;
+  address private _treasuryReceiver;
+  address private _burnReceiver;
+  address private _prismaDividendToken;
 
   mapping(address => uint256) private _balances;
   mapping(address => mapping(address => uint256)) private _allowances;
   mapping(address => bool) private _isFeeExempt;
   mapping(address => bool) private _automatedMarketMakerPairs;
   mapping(address => uint256) private _stakedPrisma;
-  mapping(address => bool) private _notStakingQualified;
 
   bool private _isInternalTransaction;
   bool private _stakingEnabled;
-  bool private processDividendStatus = true;
-  bool private prismaDividendEnabled = true;
-  bool private _processAutoReinvest = true;
 
   uint256 private _totalSupply;
   uint256 private _buyLiquidityFee;
@@ -49,7 +44,6 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   uint256 private _sellLiquidityFee;
   uint256 private _sellTreasuryFee;
   uint256 private _sellBurnFee;
-  uint256 private _minStakeAmount;
   uint256 private _totalStakedAmount;
   uint256 private _minSwapFees = 10_000 * 10 ** 18;
 
@@ -75,32 +69,29 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
    * construction.
    */
   function init(
-    address _prismaDividendToken,
-    address _tracker,
-    address router_
+    address prismaDividendToken_,
+    address tracker_
   ) public initializer {
     __Ownable_init();
     __ERC20_init("Prisma Finance", "PRISMA");
 
-    liquidityReceiver = 0x90F79bf6EB2c4f870365E785982E1f101E93b906; // development wallet
-    treasuryReceiver = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65; // development wallet
-    multisig = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; // development wallet
-    _router = IUniswapV2Router02(router_);
+    _liquidityReceiver = 0x90F79bf6EB2c4f870365E785982E1f101E93b906; // development wallet
+    _treasuryReceiver = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65; // development wallet
+    _multisig = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC; // development wallet
     _totalSupply = 100_000_000 * (10 ** 18);
     _buyLiquidityFee = 2;
     _buyTreasuryFee = 2;
     _sellLiquidityFee = 2;
     _sellTreasuryFee = 2;
-    _minStakeAmount = 10 * (10 ** 18); // Need to discuss this number
     _stakingEnabled = true;
 
-    prismaDividendToken = _prismaDividendToken;
-    prismaDividendTracker = IPrismaDividendTracker(_tracker);
+    _prismaDividendToken = prismaDividendToken_;
+    _prismaDividendTracker = IPrismaDividendTracker(tracker_);
 
     _balances[msg.sender] = _totalSupply;
 
-    _isFeeExempt[multisig] = true;
-    _isFeeExempt[_tracker] = true;
+    _isFeeExempt[_multisig] = true;
+    _isFeeExempt[tracker_] = true;
   }
 
   ///////////
@@ -121,13 +112,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
    */
   function balanceOf(
     address account
-  )
-    public
-    view
-    virtual
-    override(ERC20Upgradeable, IPrismaToken)
-    returns (uint256)
-  {
+  ) public view virtual override returns (uint256) {
     return _balances[account];
   }
 
@@ -141,7 +126,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   function transfer(
     address to,
     uint256 amount
-  ) public virtual override(ERC20Upgradeable, IPrismaToken) returns (bool) {
+  ) public virtual override returns (bool) {
     address owner = _msgSender();
     _transferFrom(owner, to, amount);
     return true;
@@ -222,7 +207,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
     uint256 fromBalance = _balances[from];
 
-    bool overMinSwapFees = balanceOf(address(prismaDividendTracker)) >=
+    bool overMinSwapFees = balanceOf(address(_prismaDividendTracker)) >=
       _minSwapFees;
 
     uint256 fee;
@@ -232,7 +217,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
       if (_automatedMarketMakerPairs[from] && !_isFeeExempt[to]) {
         if (getTotalBuyFees() > 0) {
           fee = (amount * getTotalBuyFees()) / 100;
-          _balances[address(prismaDividendTracker)] += fee;
+          _balances[address(_prismaDividendTracker)] += fee;
           if (_buyBurnFee > 0) {
             uint256 buyBurn = (fee * _buyBurnFee) / getTotalBuyFees();
             _balances[DEAD] += buyBurn;
@@ -249,14 +234,14 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
         if (!_isFeeExempt[from]) {
           if (getTotalSellFees() > 0) {
             fee = (amount * getTotalSellFees()) / 100;
-            _balances[address(prismaDividendTracker)] += fee;
+            _balances[address(_prismaDividendTracker)] += fee;
             if (_sellBurnFee > 0) {
               uint256 sellBurn = (fee * _sellBurnFee) / getTotalSellFees();
               _balances[DEAD] += sellBurn;
             }
             if (overMinSwapFees) {
               _isInternalTransaction = true;
-              prismaDividendTracker.swapFees();
+              _prismaDividendTracker.swapFees();
               _isInternalTransaction = false;
             }
           }
@@ -278,10 +263,8 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
       _balances[to] += amountReceived;
     }
 
-    try
-      prismaDividendTracker.setBalance(payable(from), balanceOf(from))
-    {} catch {}
-    try prismaDividendTracker.setBalance(payable(to), balanceOf(to)) {} catch {}
+    try _prismaDividendTracker.setBalance(from, balanceOf(from)) {} catch {}
+    try _prismaDividendTracker.setBalance(to, balanceOf(to)) {} catch {}
 
     emit Transfer(from, to, amountReceived);
   }
@@ -296,15 +279,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   function stakePrisma(uint256 _amount) external {
     require(_stakingEnabled, "Staking is paused");
     address _user = msg.sender;
-    require(
-      !_notStakingQualified[_user],
-      "The address is not allowed to stake or unstake"
-    );
     require(_balances[_user] >= _amount, "Not enough tokens to stake");
-    require(
-      _amount >= _minStakeAmount,
-      "Amount is less than minimum required token"
-    );
 
     _stakedPrisma[_user] += _amount;
     _totalStakedAmount += _amount;
@@ -316,10 +291,6 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   function unstakePrisma(uint256 _amount) external {
     require(_stakingEnabled, "Staking is paused");
     address _user = msg.sender;
-    require(
-      !_notStakingQualified[_user],
-      "The address is not allowed to stake or unstake"
-    );
     require(_stakedPrisma[_user] >= _amount, "Not enough tokens to unstake");
 
     _stakedPrisma[_user] -= _amount;
@@ -334,25 +305,21 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     address _staker,
     uint256 _prismaToCompound
   ) external override {
-    require(msg.sender == address(prismaDividendTracker), "NOT PRISMA_TRACKER");
-    require(_stakingEnabled, "Staking is paused");
     require(
-      !_notStakingQualified[_staker],
-      "The address is not allowed to stake or unstake"
+      msg.sender == address(_prismaDividendTracker),
+      "NOT PRISMA_TRACKER"
     );
+    require(_stakingEnabled, "Staking is paused");
     _balances[_staker] += _prismaToCompound;
     _balances[msg.sender] -= _prismaToCompound;
     _stakedPrisma[_staker] += _prismaToCompound;
     _totalStakedAmount += _prismaToCompound;
 
     try
-      prismaDividendTracker.setBalance(
-        payable(msg.sender),
-        balanceOf(msg.sender)
-      )
+      _prismaDividendTracker.setBalance(msg.sender, balanceOf(msg.sender))
     {} catch {}
     try
-      prismaDividendTracker.setBalance(payable(_staker), balanceOf(_staker))
+      _prismaDividendTracker.setBalance(_staker, balanceOf(_staker))
     {} catch {}
   }
 
@@ -384,6 +351,10 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     _sellBurnFee = newValue;
   }
 
+  function setMinSwapFees(uint256 newValue) external onlyOwner {
+    _minSwapFees = newValue;
+  }
+
   function setAutomatedMarketPair(
     address _pair,
     bool _active
@@ -391,23 +362,15 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     _automatedMarketMakerPairs[_pair] = _active;
   }
 
-  function setProcessDividendStatus(bool _active) external onlyOwner {
-    processDividendStatus = _active;
-  }
-
-  function setPrismaDividendEnabled(bool _enabled) external onlyOwner {
-    prismaDividendEnabled = _enabled;
-  }
-
   function setPrismaDividendToken(
-    address _prismaDividendToken
+    address prismaDividendToken_
   ) external onlyOwner {
-    prismaDividendToken = _prismaDividendToken;
+    _prismaDividendToken = prismaDividendToken_;
   }
 
   function updatePrismaDividendTracker(address newAddress) external onlyOwner {
     require(
-      newAddress != address(prismaDividendTracker),
+      newAddress != address(_prismaDividendTracker),
       "The dividend tracker already has that address"
     );
     IPrismaDividendTracker new_IPrismaDividendTracker = IPrismaDividendTracker(
@@ -421,17 +384,17 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
       newAddress,
       address(new_IPrismaDividendTracker)
     );
-    prismaDividendTracker = new_IPrismaDividendTracker;
+    _prismaDividendTracker = new_IPrismaDividendTracker;
   }
 
-  function excludeFromDividend(address account) public onlyOwner {
-    prismaDividendTracker.excludeFromDividends(address(account));
+  function excludeFromDividend(address account) external onlyOwner {
+    _prismaDividendTracker.excludeFromDividends(address(account));
   }
 
   function updateMinimumBalanceForDividends(
     uint256 newMinimumBalance
   ) external onlyOwner {
-    prismaDividendTracker.updateMinimumTokenBalanceForDividends(
+    _prismaDividendTracker.updateMinimumTokenBalanceForDividends(
       newMinimumBalance
     );
   }
@@ -440,28 +403,13 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     address _newContract,
     uint256 gas
   ) external onlyOwner {
-    prismaDividendTracker.process(gas, false);
-    prismaDividendToken = _newContract;
-    prismaDividendTracker.setDividendTokenAddress(_newContract);
-  }
-
-  function setMinStakeAmount(uint256 newValue) external onlyOwner {
-    _minStakeAmount = newValue;
+    _prismaDividendTracker.process(gas, false);
+    _prismaDividendToken = _newContract;
+    _prismaDividendTracker.setDividendTokenAddress(_newContract);
   }
 
   function setStakingStatus(bool status) external onlyOwner {
     _stakingEnabled = status;
-  }
-
-  function setNotStakingQualified(
-    address user,
-    bool notQualified
-  ) external onlyOwner {
-    _notStakingQualified[user] = notQualified;
-  }
-
-  function setProcessAutoReinvest(bool status) external onlyOwner {
-    _processAutoReinvest = status;
   }
 
   //////////////////////
@@ -501,19 +449,19 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
   }
 
   function getMultisig() external view returns (address) {
-    return multisig;
+    return _multisig;
   }
 
-  function getTreasury() external view returns (address) {
-    return treasuryReceiver;
+  function getTreasuryReceiver() external view returns (address) {
+    return _treasuryReceiver;
   }
 
-  function getBurn() external view returns (address) {
-    return burnReceiver;
+  function getBurnReceiver() external view returns (address) {
+    return _burnReceiver;
   }
 
   function getPrismaDividendTracker() external view returns (address pair) {
-    return address(prismaDividendTracker);
+    return address(_prismaDividendTracker);
   }
 
   function getTotalPrismaDividendsDistributed()
@@ -521,31 +469,31 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     view
     returns (uint256)
   {
-    return prismaDividendTracker.getTotalDividendsDistributed();
+    return _prismaDividendTracker.getTotalDividendsDistributed();
   }
 
   function withdrawablePrismaDividendOf(
     address account
   ) external view returns (uint256) {
-    return prismaDividendTracker.withdrawableDividendOf(account);
+    return _prismaDividendTracker.withdrawableDividendOf(account);
   }
 
   function prismaDividendTokenBalanceOf(
     address account
   ) public view returns (uint256) {
-    return prismaDividendTracker.balanceOf(account);
+    return _prismaDividendTracker.balanceOf(account);
   }
 
   function getAccountPrismaDividendsInfo(
     address account
   ) external view returns (address, int256, int256, uint256, uint256) {
-    return prismaDividendTracker.getAccount(account);
+    return _prismaDividendTracker.getAccount(account);
   }
 
   function getAccountPrismaDividendsInfoAtIndex(
     uint256 index
   ) external view returns (address, int256, int256, uint256, uint256) {
-    return prismaDividendTracker.getAccountAtIndex(index);
+    return _prismaDividendTracker.getAccountAtIndex(index);
   }
 
   function getLastPrismaDividendProcessedIndex()
@@ -553,7 +501,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     view
     returns (uint256)
   {
-    return prismaDividendTracker.getLastProcessedIndex();
+    return _prismaDividendTracker.getLastProcessedIndex();
   }
 
   function getNumberOfPrismaDividendTokenHolders()
@@ -561,15 +509,11 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     view
     returns (uint256)
   {
-    return prismaDividendTracker.getNumberOfTokenHolders();
+    return _prismaDividendTracker.getNumberOfTokenHolders();
   }
 
   function getStakedPrisma(address _user) external view returns (uint256) {
     return _stakedPrisma[_user];
-  }
-
-  function getMinStakeAmount() external view returns (uint256) {
-    return _minStakeAmount;
   }
 
   function getStakingStatus() external view returns (bool) {
@@ -578,9 +522,5 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
   function getTotalStakedAmount() external view returns (uint256) {
     return _totalStakedAmount;
-  }
-
-  function getProcessAutoReinvest() external view returns (bool) {
-    return _processAutoReinvest;
   }
 }
