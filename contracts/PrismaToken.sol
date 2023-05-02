@@ -89,7 +89,7 @@ contract ALPHA_PrismaToken is
     _treasuryReceiver = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
     _multisig = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
 
-    _totalSupply = 100_000_000 * (10 ** 18);
+    _totalSupply = 10_000_000 * (10 ** 18);
     _minSwapFees = 10_000 * 10 ** 18;
     _buyLiquidityFee = 2;
     _buyTreasuryFee = 2;
@@ -291,7 +291,10 @@ contract ALPHA_PrismaToken is
   function stakePrisma(uint256 _amount) external {
     require(_stakingEnabled, "Staking is paused");
     address _user = msg.sender;
-    require(_balances[_user] >= _amount, "Not enough tokens to stake");
+    require(
+      _balances[_user] >= _amount + _stakedPrisma[_user],
+      "Not enough tokens to stake"
+    );
 
     _stakedPrisma[_user] += _amount;
     _totalStakedAmount += _amount;

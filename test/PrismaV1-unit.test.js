@@ -19,8 +19,8 @@ describe("PrismaV1 Test", () => {
 
     await deployments.fixture("all")
 
-    prismaToken = await ethers.getContract("PrismaToken", deployer)
-    tracker = await ethers.getContract("PrismaDividendTracker", deployer)
+    prismaToken = await ethers.getContract("ALPHA_PrismaToken", deployer)
+    tracker = await ethers.getContract("ALPHA_PrismaDividendTracker", deployer)
     busd = await ethers.getContract("MockBUSDToken", deployer)
     wbnb = await ethers.getContract("MockWBNBToken", deployer)
 

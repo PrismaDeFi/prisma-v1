@@ -320,10 +320,7 @@ contract ALPHA_PrismaDividendTracker is
 
     uint256 amount = ERC20Upgradeable(_dividendToken).balanceOf(address(this));
     if (amount > 0) {
-      _magnifiedDividendPerShare =
-        _magnifiedDividendPerShare +
-        (amount * _magnitude) /
-        totalSupply();
+      _magnifiedDividendPerShare += (amount * _magnitude) / totalSupply();
 
       emit DividendsDistributed(msg.sender, amount);
 
