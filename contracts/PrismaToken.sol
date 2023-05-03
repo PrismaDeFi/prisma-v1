@@ -1,6 +1,13 @@
+// ██████╗ ██████╗ ██╗███████╗███╗   ███╗ █████╗     ███████╗██╗███╗   ██╗ █████╗ ███╗   ██╗ ██████╗███████╗
+// ██╔══██╗██╔══██╗██║██╔════╝████╗ ████║██╔══██╗    ██╔════╝██║████╗  ██║██╔══██╗████╗  ██║██╔════╝██╔════╝
+// ██████╔╝██████╔╝██║███████╗██╔████╔██║███████║    █████╗  ██║██╔██╗ ██║███████║██╔██╗ ██║██║     █████╗
+// ██╔═══╝ ██╔══██╗██║╚════██║██║╚██╔╝██║██╔══██║    ██╔══╝  ██║██║╚██╗██║██╔══██║██║╚██╗██║██║     ██╔══╝
+// ██║     ██║  ██║██║███████║██║ ╚═╝ ██║██║  ██║    ██║     ██║██║ ╚████║██║  ██║██║ ╚████║╚██████╗███████╗
+// ╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝     ╚═╝╚═╝  ╚═╝    ╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝╚══════╝
+
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.17;
+pragma solidity 0.8.18;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
@@ -8,27 +15,28 @@ import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 import "./IPrismaToken.sol";
 import "./IPrismaDividendTracker.sol";
 
-contract ALPHA_PrismaToken is
+contract BETA_PrismaToken is
   IPrismaToken,
   ERC20Upgradeable,
   OwnableUpgradeable
 {
-  ///////////////
-  // CONSTANTS //
-  ///////////////
+  /////////////////
+  /// CONSTANTS ///
+  /////////////////
 
   address private constant DEAD = 0x000000000000000000000000000000000000dEaD;
   address private constant ZERO = 0x0000000000000000000000000000000000000000;
 
-  ///////////////
-  // VARIABLES //
-  ///////////////
+  /////////////////
+  /// VARIABLES ///
+  /////////////////
 
   IPrismaDividendTracker private _prismaDividendTracker;
 
   address private _multisig;
   address private _liquidityReceiver;
   address private _treasuryReceiver;
+  address private _itfReceiver;
   address private _burnReceiver;
   address private _prismaDividendToken;
 
@@ -44,16 +52,18 @@ contract ALPHA_PrismaToken is
   uint256 private _totalSupply;
   uint256 private _buyLiquidityFee;
   uint256 private _buyTreasuryFee;
+  uint256 private _buyItfFee;
   uint256 private _buyBurnFee;
   uint256 private _sellLiquidityFee;
   uint256 private _sellTreasuryFee;
+  uint256 private _sellItfFee;
   uint256 private _sellBurnFee;
   uint256 private _totalStakedAmount;
   uint256 private _minSwapFees;
 
-  ////////////
-  // Events //
-  ////////////
+  //////////////
+  /// Events ///
+  //////////////
 
   event TreasuryFeeCollected(uint256 amount);
   event BurnFeeCollected(uint256 amount);
@@ -63,9 +73,9 @@ contract ALPHA_PrismaToken is
   );
   event PrismaDividendEnabled_Updated(bool enabled);
 
-  /////////////////
-  // INITIALIZER //
-  /////////////////
+  ///////////////////
+  /// INITIALIZER ///
+  ///////////////////
 
   /**
    * @dev Sets the values for {name} and {symbol}.
@@ -79,22 +89,20 @@ contract ALPHA_PrismaToken is
     __Ownable_init();
     __ERC20_init("Prisma Finance", "PRISMA");
 
-    // LOCAL TESTNET ONLY
-    // _liquidityReceiver = 0x90F79bf6EB2c4f870365E785982E1f101E93b906;
-    // _treasuryReceiver = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65;
-    // _multisig = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
-
     // PUBLIC TESTNET ONLY
     _liquidityReceiver = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
     _treasuryReceiver = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
+    _itfReceiver = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
     _multisig = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
 
     _totalSupply = 10_000_000 * (10 ** 18);
     _minSwapFees = 10_000 * 10 ** 18;
-    _buyLiquidityFee = 2;
-    _buyTreasuryFee = 2;
-    _sellLiquidityFee = 2;
-    _sellTreasuryFee = 2;
+    _buyLiquidityFee = 1;
+    _buyTreasuryFee = 1;
+    _buyItfFee = 2;
+    _sellLiquidityFee = 1;
+    _sellTreasuryFee = 1;
+    _sellItfFee = 2;
     _stakingEnabled = true;
 
     _prismaDividendToken = prismaDividendToken_;
@@ -106,9 +114,9 @@ contract ALPHA_PrismaToken is
     _isFeeExempt[tracker_] = true;
   }
 
-  ///////////
-  // ERC20 //
-  ///////////
+  /////////////
+  /// ERC20 ///
+  /////////////
 
   /**
    * @notice Returns the total number of tokens in existance.
@@ -281,9 +289,9 @@ contract ALPHA_PrismaToken is
     emit Transfer(from, to, amountReceived);
   }
 
-  //////////////
-  // Staking //
-  ////////////
+  ///////////////
+  /// Staking ///
+  ///////////////
 
   /**
    * @dev Stake given `_amount` of Prisma Token
@@ -338,9 +346,9 @@ contract ALPHA_PrismaToken is
     {} catch {}
   }
 
-  //////////////////////
-  // Setter Functions //
-  //////////////////////
+  ////////////////////////
+  /// Setter Functions ///
+  ////////////////////////
 
   function setBuyLiquidityFee(uint256 newValue) external onlyOwner {
     _buyLiquidityFee = newValue;
@@ -348,6 +356,10 @@ contract ALPHA_PrismaToken is
 
   function setBuyTreasuryFee(uint256 newValue) external onlyOwner {
     _buyTreasuryFee = newValue;
+  }
+
+  function setBuyItfFee(uint256 newValue) external onlyOwner {
+    _buyItfFee = newValue;
   }
 
   function setBuyBurnFee(uint256 newValue) external onlyOwner {
@@ -360,6 +372,10 @@ contract ALPHA_PrismaToken is
 
   function setSellTreasuryFee(uint256 newValue) external onlyOwner {
     _sellTreasuryFee = newValue;
+  }
+
+  function setSellItfFee(uint256 newValue) external onlyOwner {
+    _sellItfFee = newValue;
   }
 
   function setSellBurnFee(uint256 newValue) external onlyOwner {
@@ -427,16 +443,16 @@ contract ALPHA_PrismaToken is
     _stakingEnabled = status;
   }
 
-  //////////////////////
-  // Getter Functions //
-  //////////////////////
+  ////////////////////////
+  /// Getter Functions ///
+  ////////////////////////
 
   function getTotalBuyFees() public view returns (uint256) {
-    return _buyLiquidityFee + _buyTreasuryFee + _buyBurnFee;
+    return _buyLiquidityFee + _buyTreasuryFee + _buyItfFee + _buyBurnFee;
   }
 
   function getTotalSellFees() public view returns (uint256) {
-    return _sellLiquidityFee + _sellTreasuryFee + _sellBurnFee;
+    return _sellLiquidityFee + _sellTreasuryFee + _sellItfFee + _sellBurnFee;
   }
 
   function getBuyLiquidityFee() external view returns (uint256) {
@@ -445,6 +461,10 @@ contract ALPHA_PrismaToken is
 
   function getBuyTreasuryFee() external view returns (uint256) {
     return _buyTreasuryFee;
+  }
+
+  function getBuyItfFee() external view returns (uint256) {
+    return _buyItfFee;
   }
 
   function getBuyBurnFee() external view returns (uint256) {
@@ -459,6 +479,10 @@ contract ALPHA_PrismaToken is
     return _sellTreasuryFee;
   }
 
+  function getSellItfFee() external view returns (uint256) {
+    return _sellItfFee;
+  }
+
   function getSellBurnFee() external view returns (uint256) {
     return _sellBurnFee;
   }
@@ -469,6 +493,10 @@ contract ALPHA_PrismaToken is
 
   function getTreasuryReceiver() external view returns (address) {
     return _treasuryReceiver;
+  }
+
+  function getItfReceiver() external view returns (address) {
+    return _itfReceiver;
   }
 
   function getBurnReceiver() external view returns (address) {

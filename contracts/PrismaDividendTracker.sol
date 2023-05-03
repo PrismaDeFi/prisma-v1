@@ -1,6 +1,13 @@
+// ██████╗ ██████╗ ██╗███████╗███╗   ███╗ █████╗     ███████╗██╗███╗   ██╗ █████╗ ███╗   ██╗ ██████╗███████╗
+// ██╔══██╗██╔══██╗██║██╔════╝████╗ ████║██╔══██╗    ██╔════╝██║████╗  ██║██╔══██╗████╗  ██║██╔════╝██╔════╝
+// ██████╔╝██████╔╝██║███████╗██╔████╔██║███████║    █████╗  ██║██╔██╗ ██║███████║██╔██╗ ██║██║     █████╗
+// ██╔═══╝ ██╔══██╗██║╚════██║██║╚██╔╝██║██╔══██║    ██╔══╝  ██║██║╚██╗██║██╔══██║██║╚██╗██║██║     ██╔══╝
+// ██║     ██║  ██║██║███████║██║ ╚═╝ ██║██║  ██║    ██║     ██║██║ ╚████║██║  ██║██║ ╚████║╚██████╗███████╗
+// ╚═╝     ╚═╝  ╚═╝╚═╝╚══════╝╚═╝     ╚═╝╚═╝  ╚═╝    ╚═╝     ╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚═╝  ╚═══╝ ╚═════╝╚══════╝
+
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.17;
+pragma solidity 0.8.18;
 
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
@@ -11,7 +18,7 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
-contract ALPHA_PrismaDividendTracker is
+contract BETA_PrismaDividendTracker is
   IPrismaDividendTracker,
   ERC20Upgradeable,
   OwnableUpgradeable
@@ -20,9 +27,9 @@ contract ALPHA_PrismaDividendTracker is
 
   IterableMapping.Map private _tokenHoldersMap;
 
-  ///////////////
-  // VARIABLES //
-  ///////////////
+  /////////////////
+  /// VARIABLES ///
+  /////////////////
 
   /**
    * @dev With `magnitude`, we can properly distribute dividends even if the amount of received ether is small.
@@ -59,9 +66,9 @@ contract ALPHA_PrismaDividendTracker is
   address private _pair;
   address private _dividendToken;
 
-  ////////////
-  // Events //
-  ////////////
+  //////////////
+  /// Events ///
+  //////////////
 
   event DividendsDistributed(address indexed from, uint256 weiAmount);
   event DividendWithdrawn(address indexed to, uint256 weiAmount);
@@ -80,9 +87,9 @@ contract ALPHA_PrismaDividendTracker is
     uint256 indexed oldValue
   );
 
-  /////////////////
-  // INITIALIZER //
-  /////////////////
+  ///////////////////
+  /// INITIALIZER ///
+  ///////////////////
 
   /**
    * @notice Creates an ERC20 token that will be used to track dividends
@@ -107,9 +114,9 @@ contract ALPHA_PrismaDividendTracker is
     _gasForProcessing = 10_000_000;
   }
 
-  ///////////
-  // ERC20 //
-  ///////////
+  /////////////
+  /// ERC20 ///
+  /////////////
 
   function balanceOf(
     address account
@@ -249,9 +256,8 @@ contract ALPHA_PrismaDividendTracker is
       collectedFees -= burnBNB;
     }
 
-    // uint256 treasuryBNB = (collectedFees * (_prisma.getSellTreasuryFee())) /
-    //   (_prisma.getTotalSellFees());
-    uint256 treasuryBNB = collectedFees;
+    uint256 treasuryBNB = (collectedFees * (_prisma.getSellTreasuryFee())) /
+      (_prisma.getTotalSellFees());
     ERC20Upgradeable(_dividendToken).transfer(
       _prisma.getTreasuryReceiver(),
       treasuryBNB
@@ -260,11 +266,24 @@ contract ALPHA_PrismaDividendTracker is
     // if (_success) {
     //   emit TreasuryFeeCollected(treasuryBNB);
     // }
+    collectedFees -= treasuryBNB;
+
+    // uint256 itfBNB = (collectedFees * (_prisma.getSellItfFee())) /
+    //   (_prisma.getTotalSellFees());
+    uint256 itfBNB = collectedFees;
+    ERC20Upgradeable(_dividendToken).transfer(
+      _prisma.getTreasuryReceiver(),
+      itfBNB
+    );
+    // (bool _success, ) = address(itfReceiver).call{value: itfBNB}("");
+    // if (_success) {
+    //   emit itfFeeCollected(itfBNB);
+    // }
   }
 
-  ////////////////////////////
-  // Dividends Distribution //
-  ////////////////////////////
+  //////////////////////////////
+  /// Dividends Distribution ///
+  //////////////////////////////
 
   /**
    * @notice Updates the holders struct
@@ -333,9 +352,9 @@ contract ALPHA_PrismaDividendTracker is
     }
   }
 
-  //////////////////////////
-  // Dividends Withdrawal //
-  //////////////////////////
+  ////////////////////////////
+  /// Dividends Withdrawal ///
+  ////////////////////////////
 
   /**
    * @notice Processes dividends for all token holders
@@ -452,9 +471,9 @@ contract ALPHA_PrismaDividendTracker is
     return 0;
   }
 
-  /////////////////////////////
-  // Dividends Reinvestmnent //
-  ////////////////////////////
+  ///////////////////////////////
+  /// Dividends Reinvestmnent ///
+  ///////////////////////////////
 
   function autoReinvest() internal {
     uint256 _totalStakedPrisma = _prisma.getTotalStakedAmount();
@@ -557,9 +576,9 @@ contract ALPHA_PrismaDividendTracker is
     }
   }
 
-  ////////////////////
-  // Dividends Math //
-  ////////////////////
+  //////////////////////
+  /// Dividends Math ///
+  //////////////////////
 
   /**
    * @notice View the amount of dividend in wei that an address can withdraw.
@@ -605,9 +624,9 @@ contract ALPHA_PrismaDividendTracker is
     return _prismaDividend;
   }
 
-  //////////////////////
-  // Setter Functions //
-  //////////////////////
+  ////////////////////////
+  /// Setter Functions ///
+  ////////////////////////
 
   /**
    * @notice Updates the minimum balance required to be eligible for dividends
@@ -663,9 +682,9 @@ contract ALPHA_PrismaDividendTracker is
     emit GasForProcessing_Updated(newValue, _gasForProcessing);
   }
 
-  ///////////////////////
-  // Getter Functions //
-  /////////////////////
+  ////////////////////////
+  /// Getter Functions ///
+  ////////////////////////
 
   /**
    * @notice Returns the total amount of dividends distributed by the contract
