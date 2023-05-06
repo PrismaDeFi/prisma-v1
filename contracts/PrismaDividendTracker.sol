@@ -271,10 +271,7 @@ contract BETA_PrismaDividendTracker is
     // uint256 itfBNB = (collectedFees * (_prisma.getSellItfFee())) /
     //   (_prisma.getTotalSellFees());
     uint256 itfBNB = collectedFees;
-    ERC20Upgradeable(_dividendToken).transfer(
-      _prisma.getTreasuryReceiver(),
-      itfBNB
-    );
+    ERC20Upgradeable(_dividendToken).transfer(_prisma.getItfReceiver(), itfBNB);
     // (bool _success, ) = address(itfReceiver).call{value: itfBNB}("");
     // if (_success) {
     //   emit itfFeeCollected(itfBNB);

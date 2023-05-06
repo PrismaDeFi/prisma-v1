@@ -22,7 +22,7 @@ contract BETA_PrismaCharity is Ownable {
   ) external onlyOwner {
     uint256 balance = IERC20(token).balanceOf(address(this));
     if (token == prismaProxy) {
-      require(balance - amount > (2_000_000 * (10 ** 18)));
+      require(balance - amount > (200_000 * (10 ** 18)));
     }
     IERC20(token).transfer(dst, amount);
   }

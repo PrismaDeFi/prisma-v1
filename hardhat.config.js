@@ -41,6 +41,7 @@ module.exports = {
     token: "BNB",
     currency: "USD",
     outputFile: "gas-report.txt",
+    gasPrice: 3,
     noColors: true,
     coinmarketcap: process.env.COINMARKETCAP_API_KEY,
   },

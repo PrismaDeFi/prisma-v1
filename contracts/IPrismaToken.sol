@@ -9,6 +9,8 @@ interface IPrismaToken {
 
   function getTreasuryReceiver() external view returns (address);
 
+  function getItfReceiver() external view returns (address);
+
   function getBurnReceiver() external view returns (address);
 
   function getStakedPrisma(address _user) external view returns (uint256);
