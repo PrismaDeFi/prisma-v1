@@ -459,6 +459,7 @@ contract BETA_PrismaDividendTracker is
     }
 
     if (_amount > 0) {
+      _lastDistribution -= _amount;
       emit Claim(account, _amount, false);
       return true;
     }
@@ -580,6 +581,7 @@ contract BETA_PrismaDividendTracker is
       );
 
       _withdrawnDividends[msg.sender] += amount;
+      _lastDistribution -= amount;
       IERC20Upgradeable(_dividendToken).approve(address(_router), amount);
       address[] memory path = new address[](2);
       path[0] = _dividendToken;
