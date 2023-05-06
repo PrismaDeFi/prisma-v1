@@ -38,6 +38,7 @@ contract BETA_PrismaDividendTracker is
 
   uint256 private _magnifiedPrismaPerShare;
   uint256 private _magnifiedDividendPerShare;
+  uint256 private _lastDistribution;
   uint256 private _lastProcessedIndex;
   uint256 private _minimumTokenBalanceForDividends;
   uint256 private _gasForProcessing;
@@ -334,7 +335,8 @@ contract BETA_PrismaDividendTracker is
     require(msg.sender == _prisma.getMultisig(), "Not multisig");
     require(totalSupply() > 0);
 
-    uint256 amount = ERC20Upgradeable(_dividendToken).balanceOf(address(this));
+    uint256 amount = ERC20Upgradeable(_dividendToken).balanceOf(address(this)) -
+      _lastDistribution;
     if (amount > 0) {
       _magnifiedDividendPerShare += (amount * _magnitude) / totalSupply();
 
@@ -346,6 +348,10 @@ contract BETA_PrismaDividendTracker is
         process(_gasForProcessing, false);
         autoReinvest();
       }
+
+      _lastDistribution = ERC20Upgradeable(_dividendToken).balanceOf(
+        address(this)
+      );
     }
   }
 
