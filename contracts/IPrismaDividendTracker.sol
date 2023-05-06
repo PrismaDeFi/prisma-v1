@@ -71,15 +71,6 @@ interface IPrismaDividendTracker {
   function setBalance(address account, uint256 newBalance) external;
 
   /**
-   * @notice Processes dividends for all token holders
-   * @param gas Amount of gas to use for the transaction
-   */
-  function process(
-    uint256 gas,
-    bool reinvesting
-  ) external returns (uint256, uint256, uint256);
-
-  /**
    * @dev Returns the amount of tokens owned by `account`.
    */
   function balanceOf(address account) external view returns (uint256);

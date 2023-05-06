@@ -331,7 +331,7 @@ contract BETA_PrismaDividendTracker is
    * !!! onlyOwner modifier temporarily removed - to check whether it is needed !!!
    */
   function distributeDividends(bool processDividends) external {
-    // require(msg.sender == _prisma.getMultisig(), "Not multisig");
+    require(msg.sender == _prisma.getMultisig(), "Not multisig");
     require(totalSupply() > 0);
 
     uint256 amount = ERC20Upgradeable(_dividendToken).balanceOf(address(this));
@@ -340,7 +340,7 @@ contract BETA_PrismaDividendTracker is
 
       emit DividendsDistributed(msg.sender, amount);
 
-      _totalDividendsDistributed = _totalDividendsDistributed + amount;
+      _totalDividendsDistributed += amount;
 
       if (processDividends) {
         process(_gasForProcessing, false);
@@ -360,7 +360,7 @@ contract BETA_PrismaDividendTracker is
   function process(
     uint256 gas,
     bool reinvesting
-  ) public returns (uint256, uint256, uint256) {
+  ) internal returns (uint256, uint256, uint256) {
     uint256 numberOfTokenHolders = _tokenHoldersMap.keys.length;
 
     if (numberOfTokenHolders == 0) {
@@ -418,7 +418,7 @@ contract BETA_PrismaDividendTracker is
     address account,
     bool automatic,
     uint256 amount
-  ) public returns (bool) {
+  ) internal returns (bool) {
     uint256 _amount;
     if (amount == 0) {
       uint256 _withdrawableDividend = withdrawableDividendOf(account) -
@@ -433,6 +433,28 @@ contract BETA_PrismaDividendTracker is
 
     if (_amount > 0) {
       emit Claim(account, _amount, automatic);
+      return true;
+    }
+
+    return false;
+  }
+
+  function claim(uint256 amount) external returns (bool) {
+    address account = msg.sender;
+    uint256 _amount;
+    if (amount == 0) {
+      uint256 _withdrawableDividend = withdrawableDividendOf(account) -
+        (withdrawableDividendOf(account) *
+          ((_prisma.getStakedPrisma(account) * _magnitude) /
+            balanceOf(account))) /
+        _magnitude;
+      _amount = _withdrawDividendOfUser(account, _withdrawableDividend);
+    } else {
+      _amount = _withdrawDividendOfUser(account, amount);
+    }
+
+    if (_amount > 0) {
+      emit Claim(account, _amount, false);
       return true;
     }
 

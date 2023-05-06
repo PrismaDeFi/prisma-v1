@@ -95,12 +95,6 @@ contract BETA_PrismaToken is
     _itfReceiver = 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc;
     _multisig = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
 
-    // PUBLIC TESTNET ONLY
-    // _liquidityReceiver = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
-    // _treasuryReceiver = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
-    // _itfReceiver = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
-    // _multisig = 0x7474658eDA4B4A635Cb13941E7b7f285eaB2e686;
-
     _totalSupply = 10_000_000 * (10 ** 18);
     _minSwapFees = 1_000 * 10 ** 18;
     _buyLiquidityFee = 1;
@@ -399,12 +393,6 @@ contract BETA_PrismaToken is
     _automatedMarketMakerPairs[_pair] = _active;
   }
 
-  function setPrismaDividendToken(
-    address prismaDividendToken_
-  ) external onlyOwner {
-    _prismaDividendToken = prismaDividendToken_;
-  }
-
   function updatePrismaDividendTracker(address newAddress) external onlyOwner {
     require(
       newAddress != address(_prismaDividendTracker),
@@ -436,11 +424,7 @@ contract BETA_PrismaToken is
     );
   }
 
-  function updatePrismaDividendToken(
-    address _newContract,
-    uint256 gas
-  ) external onlyOwner {
-    _prismaDividendTracker.process(gas, false);
+  function updatePrismaDividendToken(address _newContract) external onlyOwner {
     _prismaDividendToken = _newContract;
     _prismaDividendTracker.setDividendTokenAddress(_newContract);
   }
