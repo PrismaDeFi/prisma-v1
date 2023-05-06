@@ -329,10 +329,9 @@ contract BETA_PrismaDividendTracker is
    *     and try to distribute it in the next distribution,
    *     but keeping track of such data on-chain costs much more than
    *     the saved ether, so we don't do that.
-   * !!! onlyOwner modifier temporarily removed - to check whether it is needed !!!
    */
   function distributeDividends(bool processDividends) external {
-    require(msg.sender == _prisma.getMultisig(), "Not multisig");
+    require(msg.sender == _prisma.getOwner(), "Not owner.");
     require(totalSupply() > 0);
 
     uint256 amount = ERC20Upgradeable(_dividendToken).balanceOf(address(this)) -

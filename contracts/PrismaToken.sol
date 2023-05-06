@@ -477,6 +477,10 @@ contract BETA_PrismaToken is
     return _sellBurnFee;
   }
 
+  function getOwner() external view returns (address) {
+    return owner();
+  }
+
   function getMultisig() external view returns (address) {
     return _multisig;
   }

@@ -5,7 +5,7 @@ pragma solidity 0.8.18;
 interface IPrismaToken {
   function compoundPrisma(address _staker, uint256 _prismaToCompound) external;
 
-  function getMultisig() external view returns (address);
+  function getOwner() external view returns (address);
 
   function getTreasuryReceiver() external view returns (address);
 
