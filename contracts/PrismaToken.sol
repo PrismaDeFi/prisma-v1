@@ -45,9 +45,13 @@ contract BETA_PrismaToken is
   mapping(address => bool) private _isFeeExempt;
   mapping(address => bool) private _automatedMarketMakerPairs;
   mapping(address => uint256) private _stakedPrisma;
+  mapping(bytes32 => VestingSchedule) private vestingSchedules;
+  mapping(address => uint256) private holdersVestingCount;
 
   bool private _isInternalTransaction;
   bool private _stakingEnabled;
+
+  bytes32[] private vestingSchedulesIds;
 
   uint256 private _totalSupply;
   uint256 private _buyLiquidityFee;
@@ -60,6 +64,29 @@ contract BETA_PrismaToken is
   uint256 private _sellBurnFee;
   uint256 private _totalStakedAmount;
   uint256 private _minSwapFees;
+  uint256 private vestingSchedulesTotalAmount;
+
+  struct VestingSchedule {
+    bool initialized;
+    // beneficiary of tokens after they are released
+    address beneficiary;
+    // cliff period in seconds
+    uint256 cliff;
+    // start time of the vesting period
+    uint256 start;
+    // duration of the vesting period in seconds
+    uint256 duration;
+    // duration of a slice period for the vesting in seconds
+    uint256 slicePeriodSeconds;
+    // whether or not the vesting is revocable
+    bool revocable;
+    // total amount of tokens to be released at the end of the vesting
+    uint256 amountTotal;
+    // amount of tokens released
+    uint256 released;
+    // whether or not the vesting has been revoked
+    bool revoked;
+  }
 
   //////////////
   /// Events ///
@@ -346,6 +373,129 @@ contract BETA_PrismaToken is
     {} catch {}
   }
 
+  ///////////////
+  /// Vesting ///
+  ///////////////
+
+  /**
+   * @notice Creates a new vesting schedule for a beneficiary.
+   * @param _beneficiary address of the beneficiary to whom vested tokens are transferred
+   * @param _start start time of the vesting period
+   * @param _cliff duration in seconds of the cliff in which tokens will begin to vest
+   * @param _duration duration in seconds of the period in which the tokens will vest
+   * @param _slicePeriodSeconds duration of a slice period for the vesting in seconds
+   * @param _revocable whether the vesting is revocable or not
+   * @param _amount total amount of tokens to be released at the end of the vesting
+   */
+  function createVestingSchedule(
+    address _beneficiary,
+    uint256 _start,
+    uint256 _cliff,
+    uint256 _duration,
+    uint256 _slicePeriodSeconds,
+    bool _revocable,
+    uint256 _amount
+  ) external onlyOwner {
+    require(balanceOf(address(this)) >= _amount, "Insufficient tokens");
+    require(_duration > 0, "Duration must be > 0");
+    require(_amount > 0, "Amount must be > 0");
+    require(_slicePeriodSeconds >= 1, "Period seconds must be >= 1");
+    require(_duration >= _cliff, "Duration must be >= cliff");
+    bytes32 vestingScheduleId = computeVestingScheduleIdForAddressAndIndex(
+      _beneficiary,
+      holdersVestingCount[_beneficiary]
+    );
+    uint256 cliff = _start + _cliff;
+    vestingSchedules[vestingScheduleId] = VestingSchedule(
+      true,
+      _beneficiary,
+      cliff,
+      _start,
+      _duration,
+      _slicePeriodSeconds,
+      _revocable,
+      _amount,
+      0,
+      false
+    );
+    vestingSchedulesTotalAmount = vestingSchedulesTotalAmount + _amount;
+    vestingSchedulesIds.push(vestingScheduleId);
+    uint256 currentVestingCount = holdersVestingCount[_beneficiary];
+    holdersVestingCount[_beneficiary] = currentVestingCount + 1;
+  }
+
+  /**
+   * @notice Release vested amount of tokens.
+   * @param vestingScheduleId the vesting schedule identifier
+   * @param amount the amount to release
+   */
+  function release(bytes32 vestingScheduleId, uint256 amount) public {
+    VestingSchedule storage vestingSchedule = vestingSchedules[
+      vestingScheduleId
+    ];
+    bool isBeneficiary = msg.sender == vestingSchedule.beneficiary;
+
+    address owner = owner();
+    bool isReleasor = (msg.sender == owner);
+    require(
+      isBeneficiary || isReleasor,
+      "Only beneficiary and owner can release vested tokens"
+    );
+    uint256 vestedAmount = _computeReleasableAmount(vestingSchedule);
+    require(
+      vestedAmount >= amount,
+      "Insufficient tokens to release available."
+    );
+    vestingSchedule.released = vestingSchedule.released + amount;
+    vestingSchedulesTotalAmount = vestingSchedulesTotalAmount - amount;
+    transfer(vestingSchedule.beneficiary, amount);
+  }
+
+  /**
+   * @dev Computes the releasable amount of tokens for a vesting schedule.
+   * @return the amount of releasable tokens
+   */
+  function _computeReleasableAmount(
+    VestingSchedule memory vestingSchedule
+  ) internal view returns (uint256) {
+    // Retrieve the current time.
+    uint256 currentTime = block.timestamp;
+    // If the current time is before the cliff, no tokens are releasable.
+    if ((currentTime < vestingSchedule.cliff) || vestingSchedule.revoked) {
+      return 0;
+    }
+    // If the current time is after the vesting period, all tokens are releasable,
+    // minus the amount already released.
+    else if (currentTime >= vestingSchedule.start + vestingSchedule.duration) {
+      return vestingSchedule.amountTotal - vestingSchedule.released;
+    }
+    // Otherwise, some tokens are releasable.
+    else {
+      // 10% of tokens are immediately available.
+      uint256 initialRelease = (vestingSchedule.amountTotal * 10) / 100;
+      // Compute the number of full vesting periods that have elapsed.
+      uint256 timeFromStart = currentTime - vestingSchedule.start;
+      uint256 secondsPerSlice = vestingSchedule.slicePeriodSeconds;
+      uint256 vestedSlicePeriods = timeFromStart / secondsPerSlice;
+      uint256 vestedSeconds = vestedSlicePeriods * secondsPerSlice;
+      // Compute the amount of tokens that are vested.
+      uint256 vestedAmount = (vestingSchedule.amountTotal * vestedSeconds) /
+        vestingSchedule.duration;
+      // Subtract the amount already released and return.
+      return vestedAmount + initialRelease - vestingSchedule.released;
+    }
+  }
+
+  /**
+   * @dev Computes the vesting schedule identifier for an address and an index.
+   */
+  function computeVestingScheduleIdForAddressAndIndex(
+    address holder,
+    uint256 index
+  ) public pure returns (bytes32) {
+    return keccak256(abi.encodePacked(holder, index));
+  }
+
   ////////////////////////
   /// Setter Functions ///
   ////////////////////////
@@ -559,5 +709,25 @@ contract BETA_PrismaToken is
 
   function getTotalStakedAmount() external view returns (uint256) {
     return _totalStakedAmount;
+  }
+
+  function getVestingSchedule(
+    bytes32 vestingScheduleId
+  ) public view returns (VestingSchedule memory) {
+    return vestingSchedules[vestingScheduleId];
+  }
+
+  function getVestingSchedulesCountByBeneficiary(
+    address _beneficiary
+  ) external view returns (uint256) {
+    return holdersVestingCount[_beneficiary];
+  }
+
+  function getVestingSchedulesTotalAmount() external view returns (uint256) {
+    return vestingSchedulesTotalAmount;
+  }
+
+  function getVestingSchedulesCount() public view returns (bytes32[] memory) {
+    return vestingSchedulesIds;
   }
 }

@@ -43,6 +43,7 @@ contract BETA_PrismaDividendTracker is
   uint256 private _minimumTokenBalanceForDividends;
   uint256 private _gasForProcessing;
   uint256 private _totalDividendsDistributed;
+
   bool private _processingAutoReinvest;
 
   /**
@@ -64,6 +65,7 @@ contract BETA_PrismaDividendTracker is
 
   IPrismaToken private _prisma;
   IUniswapV2Router02 private _router;
+
   address private _pair;
   address private _dividendToken;
 

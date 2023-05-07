@@ -1,4 +1,4 @@
-const { ethers, upgrades, network } = require("hardhat")
+const { ethers, upgrades, network, run } = require("hardhat")
 const { verify } = require("../utils/verify")
 const { developmentChains } = require("../helper-hardhat-config")
 
@@ -18,10 +18,6 @@ module.exports = async ({ deployments }) => {
   await factory.deployTransaction.wait()
   log(`UniswapV2Factory deployed at ${factory.address}`)
 
-  if (!developmentChains.includes(network.name)) {
-    await verify(factory.address, [deployer.address])
-  }
-
   const wbnb = await deploy("MockWBNBToken", {
     from: deployer.address,
     args: [],
@@ -30,7 +26,10 @@ module.exports = async ({ deployments }) => {
   log(`WBNB deployed at ${wbnb.address}`)
 
   if (!developmentChains.includes(network.name)) {
-    await verify(wbnb.address, [])
+    await run("verify:verify", {
+      address: wbnb.address,
+      contract: "contracts/TokenMocks/MockWBNBToken.sol:MockWBNBToken",
+    })
   }
 
   const routerAbi =
@@ -46,10 +45,6 @@ module.exports = async ({ deployments }) => {
   await router.deployTransaction.wait()
   log(`UniswapV2Router deployed at ${router.address}`)
 
-  if (!developmentChains.includes(network.name)) {
-    await verify(router.address, [factory.address, wbnb.address])
-  }
-
   const busd = await deploy("MockBUSDToken", {
     from: deployer.address,
     args: [],
@@ -58,7 +53,10 @@ module.exports = async ({ deployments }) => {
   log(`BUSD deployed at ${busd.address}`)
 
   if (!developmentChains.includes(network.name)) {
-    await verify(busd.address, [])
+    await run("verify:verify", {
+      address: busd.address,
+      contract: "contracts/TokenMocks/MockBUSDToken.sol:MockBUSDToken",
+    })
   }
 }
 

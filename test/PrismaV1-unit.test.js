@@ -1,8 +1,9 @@
 const { assert, expect } = require("chai")
 const { deployments, ethers, upgrades } = require("hardhat")
+const { time } = require("@nomicfoundation/hardhat-network-helpers")
 
-const INITIAL_BUSD_LIQUIDITY = ethers.utils.parseEther("57000")
-const INITIAL_PRISMA_LIQUIDITY = ethers.utils.parseEther("5800000")
+const INITIAL_BUSD_LIQUIDITY = ethers.utils.parseEther("53000")
+const INITIAL_PRISMA_LIQUIDITY = ethers.utils.parseEther("3500000")
 
 describe("PrismaV1 Test", () => {
   let prisma, tracker, wbnb, busd, deployer, user, multisig, liquidity, treasury
@@ -46,12 +47,6 @@ describe("PrismaV1 Test", () => {
     await this.router.deployTransaction.wait()
 
     await prisma.init(busd.address, tracker.address)
-    await prisma.transfer(deployer.address, ethers.utils.parseEther("10000000"))
-    await prisma.transfer(
-      this.router.address,
-      ethers.utils.parseEther("100000")
-    )
-
     await tracker.init(busd.address, this.router.address, prisma.address)
     const pairAddress = await this.factory.getPair(prisma.address, busd.address)
     this.pair = await ethers.getContractAt("IUniswapV2Pair", pairAddress)
@@ -59,6 +54,7 @@ describe("PrismaV1 Test", () => {
     await tracker.transferOwnership(prisma.address)
 
     await busd.transfer(tracker.address, ethers.utils.parseEther("1000"))
+    await prisma.transfer(prisma.address, ethers.utils.parseEther("100000"))
 
     await prisma.approve(this.router.address, INITIAL_PRISMA_LIQUIDITY)
     await busd.approve(this.router.address, INITIAL_BUSD_LIQUIDITY)
@@ -70,7 +66,7 @@ describe("PrismaV1 Test", () => {
       0,
       0,
       deployer.address,
-      (await ethers.provider.getBlock()).timestamp + 100
+      (await time.latest()) + 1000
     )
 
     await prisma.setAutomatedMarketPair(pairAddress, true)
@@ -251,6 +247,49 @@ describe("PrismaV1 Test", () => {
       )
     })
   })
+  describe("vesting", () => {
+    it("creates a vesting schedule", async () => {
+      await prisma.createVestingSchedule(
+        user.address,
+        await time.latest(),
+        0,
+        7776000,
+        86400,
+        false,
+        ethers.utils.parseEther("100000")
+      )
+      const id = await prisma.computeVestingScheduleIdForAddressAndIndex(
+        user.address,
+        0
+      )
+      await expect(
+        prisma.release(id, ethers.utils.parseEther("11000"))
+      ).to.be.revertedWith("Insufficient tokens to release available.")
+      await prisma.release(id, ethers.utils.parseEther("10000"))
+      assert.equal(
+        (await prisma.balanceOf(user.address)).toString(),
+        ethers.utils.parseEther("10000")
+      )
+      await expect(
+        prisma.release(id, ethers.utils.parseEther("1000"))
+      ).to.be.revertedWith("Insufficient tokens to release available.")
+      await time.increase(3888000)
+      await prisma.release(id, ethers.utils.parseEther("45000"))
+      assert.equal(
+        (await prisma.balanceOf(user.address)).toString(),
+        ethers.utils.parseEther("55000")
+      )
+      await time.increase(3888000)
+      await prisma.release(id, ethers.utils.parseEther("45000"))
+      assert.equal(
+        (await prisma.balanceOf(user.address)).toString(),
+        ethers.utils.parseEther("100000")
+      )
+      await expect(
+        prisma.release(id, ethers.utils.parseEther("1000"))
+      ).to.be.revertedWith("Insufficient tokens to release available.")
+    })
+  })
   describe("setBalance", () => {
     it("sets dividends", async () => {
       assert.equal(
@@ -261,6 +300,11 @@ describe("PrismaV1 Test", () => {
   })
   describe("distributeDividends", () => {
     it("distributes dividends", async () => {
+      const share = await tracker.balanceOf(deployer.address)
+      const dividends = await busd.balanceOf(tracker.address)
+      const shares = await tracker.totalSupply()
+      const dps = (BigInt(dividends) * BigInt(2 ** 128)) / BigInt(shares)
+      const dividend = (BigInt(share) * BigInt(dps)) / BigInt(2 ** 128)
       await tracker.distributeDividends(false)
       assert.equal(
         BigInt(await prisma.getTotalPrismaDividendsDistributed()) /
@@ -270,7 +314,7 @@ describe("PrismaV1 Test", () => {
       assert.equal(
         BigInt(await prisma.withdrawablePrismaDividendOf(deployer.address)) /
           BigInt(10 ** 18),
-        BigInt(999)
+        dividend / BigInt(10 ** 18)
       )
     })
     it("corrects dividends", async () => {
@@ -292,7 +336,7 @@ describe("PrismaV1 Test", () => {
       const dps = (BigInt(dividends) * BigInt(2 ** 128)) / BigInt(shares)
       const dividend = (BigInt(share) * BigInt(dps)) / BigInt(2 ** 128)
       await tracker.distributeDividends(false)
-      await tracker.claim(ethers.utils.parseEther("999"))
+      await tracker.claim(dividend)
       assert.equal(
         BigInt(await busd.balanceOf(deployer.address)) / BigInt(10 ** 18),
         BigInt(balanceBefore) / BigInt(10 ** 18) +
