@@ -2,9 +2,9 @@ const { ethers, upgrades } = require("hardhat")
 const { verify } = require("../utils/verify")
 
 async function main() {
-  const prismaFactory = await ethers.getContractFactory("ALPHA_PrismaToken")
+  const prismaFactory = await ethers.getContractFactory("BETA_PrismaToken")
   const upgradedToken = await upgrades.upgradeProxy(
-    "0xB7ED90F0BE22c7942133404474c7c41199C08a2D",
+    "0x96F5dfA892524b865ff0E62964FbD392022C2796",
     prismaFactory
   )
   console.log("PrismaToken upgraded")

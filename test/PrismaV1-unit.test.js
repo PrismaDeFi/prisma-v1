@@ -6,10 +6,9 @@ const INITIAL_BUSD_LIQUIDITY = ethers.utils.parseEther("53000")
 const INITIAL_PRISMA_LIQUIDITY = ethers.utils.parseEther("3500000")
 
 describe("PrismaV1 Test", () => {
-  let prisma, tracker, wbnb, busd, deployer, user, multisig, liquidity, treasury
+  let prisma, tracker, wbnb, busd, deployer, user, treasury
   beforeEach(async () => {
-    ;[deployer, user, multisig, liquidity, treasury, itf] =
-      await ethers.getSigners()
+    ;[deployer, user, treasury, itf] = await ethers.getSigners()
 
     await deployments.fixture("all")
 
@@ -46,10 +45,16 @@ describe("PrismaV1 Test", () => {
     this.router = await routerFactory.deploy(this.factory.address, wbnb.address)
     await this.router.deployTransaction.wait()
 
+    const txResponse = await this.factory.createPair(
+      prisma.address,
+      busd.address
+    )
+    const txReceipt = await txResponse.wait()
+    const pairAddress = txReceipt.events[0].args["pair"]
+    this.pair = await ethers.getContractAt("IUniswapV2Pair", pairAddress)
+
     await prisma.init(busd.address, tracker.address)
     await tracker.init(busd.address, this.router.address, prisma.address)
-    const pairAddress = await this.factory.getPair(prisma.address, busd.address)
-    this.pair = await ethers.getContractAt("IUniswapV2Pair", pairAddress)
     await tracker.excludeFromDividends(pairAddress)
     await tracker.transferOwnership(prisma.address)
 
@@ -216,13 +221,13 @@ describe("PrismaV1 Test", () => {
       await prisma.setStakingStatus(false)
       await expect(
         prisma.stakePrisma(ethers.utils.parseEther("10000"))
-      ).to.be.revertedWith("Staking is paused")
+      ).to.be.revertedWith("Staking is paused.")
     })
     it("cannot stake more tokens than owned", async () => {
       const prismaUser = prisma.connect(user)
       await expect(
         prismaUser.stakePrisma(ethers.utils.parseEther("10000"))
-      ).to.be.revertedWith("Not enough tokens to stake")
+      ).to.be.revertedWith("Not enough tokens to stake.")
     })
     it("can stake", async () => {
       await prisma.stakePrisma(ethers.utils.parseEther("10000"))
@@ -236,7 +241,7 @@ describe("PrismaV1 Test", () => {
     it("cannot unstake more than staked", async () => {
       await expect(
         prisma.unstakePrisma(ethers.utils.parseEther("10000"))
-      ).to.be.revertedWith("Not enough tokens to unstake")
+      ).to.be.revertedWith("Not enough tokens to unstake.")
     })
     it("can unstake", async () => {
       await prisma.stakePrisma(ethers.utils.parseEther("10000"))

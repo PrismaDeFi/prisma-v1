@@ -30,6 +30,6 @@ contract BETA_PrismaCharity is Ownable {
   function retrieveBNB(address dst) external onlyOwner returns (bool success) {
     uint256 balance = address(this).balance;
     (success, ) = payable(address(dst)).call{value: balance}("");
-    require(success, "Could not retrieve");
+    require(success, "Could not retrieve.");
   }
 }

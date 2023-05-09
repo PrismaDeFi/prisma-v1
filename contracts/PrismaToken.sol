@@ -24,8 +24,11 @@ contract BETA_PrismaToken is
   /// CONSTANTS ///
   /////////////////
 
+  /**
+   * @notice Dead wallet used for token burns.
+   */
+
   address private constant DEAD = 0x000000000000000000000000000000000000dEaD;
-  address private constant ZERO = 0x0000000000000000000000000000000000000000;
 
   /////////////////
   /// VARIABLES ///
@@ -33,11 +36,8 @@ contract BETA_PrismaToken is
 
   IPrismaDividendTracker private _prismaDividendTracker;
 
-  address private _multisig;
-  address private _liquidityReceiver;
   address private _treasuryReceiver;
   address private _itfReceiver;
-  address private _burnReceiver;
   address private _prismaDividendToken;
 
   mapping(address => uint256) private _balances;
@@ -45,26 +45,24 @@ contract BETA_PrismaToken is
   mapping(address => bool) private _isFeeExempt;
   mapping(address => bool) private _automatedMarketMakerPairs;
   mapping(address => uint256) private _stakedPrisma;
-  mapping(bytes32 => VestingSchedule) private vestingSchedules;
-  mapping(address => uint256) private holdersVestingCount;
 
   bool private _isInternalTransaction;
   bool private _stakingEnabled;
-
-  bytes32[] private vestingSchedulesIds;
 
   uint256 private _totalSupply;
   uint256 private _buyLiquidityFee;
   uint256 private _buyTreasuryFee;
   uint256 private _buyItfFee;
-  uint256 private _buyBurnFee;
   uint256 private _sellLiquidityFee;
   uint256 private _sellTreasuryFee;
   uint256 private _sellItfFee;
-  uint256 private _sellBurnFee;
   uint256 private _totalStakedAmount;
   uint256 private _minSwapFees;
+
   uint256 private vestingSchedulesTotalAmount;
+  bytes32[] private vestingSchedulesIds;
+  mapping(address => uint256) private holdersVestingCount;
+  mapping(bytes32 => VestingSchedule) private vestingSchedules;
 
   struct VestingSchedule {
     bool initialized;
@@ -88,18 +86,6 @@ contract BETA_PrismaToken is
     bool revoked;
   }
 
-  //////////////
-  /// Events ///
-  //////////////
-
-  event TreasuryFeeCollected(uint256 amount);
-  event BurnFeeCollected(uint256 amount);
-  event PrismaDividendTracker_Updated(
-    address indexed newAddress,
-    address indexed oldAddress
-  );
-  event PrismaDividendEnabled_Updated(bool enabled);
-
   ///////////////////
   /// INITIALIZER ///
   ///////////////////
@@ -117,10 +103,8 @@ contract BETA_PrismaToken is
     __ERC20_init("Prisma Finance", "PRISMA");
 
     // LOCAL TESTNET ONLY
-    _liquidityReceiver = 0x90F79bf6EB2c4f870365E785982E1f101E93b906;
-    _treasuryReceiver = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65;
-    _itfReceiver = 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc;
-    _multisig = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
+    _treasuryReceiver = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
+    _itfReceiver = 0x90F79bf6EB2c4f870365E785982E1f101E93b906;
 
     _totalSupply = 10_000_000 * (10 ** 18);
     _minSwapFees = 1_000 * 10 ** 18;
@@ -137,7 +121,6 @@ contract BETA_PrismaToken is
 
     _balances[msg.sender] = _totalSupply;
 
-    _isFeeExempt[_multisig] = true;
     _isFeeExempt[tracker_] = true;
   }
 
@@ -265,27 +248,19 @@ contract BETA_PrismaToken is
         if (getTotalBuyFees() > 0) {
           fee = (amount * getTotalBuyFees()) / 100;
           _balances[address(_prismaDividendTracker)] += fee;
-          if (_buyBurnFee > 0) {
-            uint256 buyBurn = (fee * _buyBurnFee) / getTotalBuyFees();
-            _balances[DEAD] += buyBurn;
-          }
         }
       }
       // Sell order
       else if (_automatedMarketMakerPairs[to]) {
         if (_stakedPrisma[from] > 0) {
           uint256 nonStakedAmount = fromBalance - _stakedPrisma[from];
-          require(nonStakedAmount >= amount, "You need to unstake first");
+          require(nonStakedAmount >= amount, "You need to unstake first.");
         }
 
         if (!_isFeeExempt[from]) {
           if (getTotalSellFees() > 0) {
             fee = (amount * getTotalSellFees()) / 100;
             _balances[address(_prismaDividendTracker)] += fee;
-            if (_sellBurnFee > 0) {
-              uint256 sellBurn = (fee * _sellBurnFee) / getTotalSellFees();
-              _balances[DEAD] += sellBurn;
-            }
             if (overMinSwapFees) {
               _isInternalTransaction = true;
               _prismaDividendTracker.swapFees();
@@ -297,7 +272,7 @@ contract BETA_PrismaToken is
         // Token Transfer
         if (_stakedPrisma[from] > 0) {
           uint256 nonStakedAmount = fromBalance - _stakedPrisma[from];
-          require(nonStakedAmount >= amount, "You need to unstake first");
+          require(nonStakedAmount >= amount, "You need to unstake first.");
         }
       }
     }
@@ -324,11 +299,11 @@ contract BETA_PrismaToken is
    * @dev Stake given `_amount` of Prisma Token
    */
   function stakePrisma(uint256 _amount) external {
-    require(_stakingEnabled, "Staking is paused");
+    require(_stakingEnabled, "Staking is paused.");
     address _user = msg.sender;
     require(
       _balances[_user] >= _amount + _stakedPrisma[_user],
-      "Not enough tokens to stake"
+      "Not enough tokens to stake."
     );
 
     _stakedPrisma[_user] += _amount;
@@ -339,9 +314,9 @@ contract BETA_PrismaToken is
    * @dev Unstake given `_amount` of Prisma Token
    */
   function unstakePrisma(uint256 _amount) external {
-    require(_stakingEnabled, "Staking is paused");
+    require(_stakingEnabled, "Staking is paused.");
     address _user = msg.sender;
-    require(_stakedPrisma[_user] >= _amount, "Not enough tokens to unstake");
+    require(_stakedPrisma[_user] >= _amount, "Not enough tokens to unstake.");
 
     _stakedPrisma[_user] -= _amount;
     _totalStakedAmount -= _amount;
@@ -351,6 +326,10 @@ contract BETA_PrismaToken is
     }
   }
 
+  /**
+   * @dev Compounds `_prismaToCompound` after users choose to reinvest their tokens.
+   * It expects to only be called by `_prismaDividendTracker` following reinvestment.
+   */
   function compoundPrisma(
     address _staker,
     uint256 _prismaToCompound
@@ -359,7 +338,7 @@ contract BETA_PrismaToken is
       msg.sender == address(_prismaDividendTracker),
       "NOT PRISMA_TRACKER"
     );
-    require(_stakingEnabled, "Staking is paused");
+    require(_stakingEnabled, "Staking is paused.");
     _balances[_staker] += _prismaToCompound;
     _balances[msg.sender] -= _prismaToCompound;
     _stakedPrisma[_staker] += _prismaToCompound;
@@ -396,11 +375,11 @@ contract BETA_PrismaToken is
     bool _revocable,
     uint256 _amount
   ) external onlyOwner {
-    require(balanceOf(address(this)) >= _amount, "Insufficient tokens");
-    require(_duration > 0, "Duration must be > 0");
-    require(_amount > 0, "Amount must be > 0");
-    require(_slicePeriodSeconds >= 1, "Period seconds must be >= 1");
-    require(_duration >= _cliff, "Duration must be >= cliff");
+    require(balanceOf(address(this)) >= _amount, "Insufficient tokens.");
+    require(_duration > 0, "Duration must be > 0.");
+    require(_amount > 0, "Amount must be > 0.");
+    require(_slicePeriodSeconds >= 1, "Period seconds must be >= 1.");
+    require(_duration >= _cliff, "Duration must be >= cliff.");
     bytes32 vestingScheduleId = computeVestingScheduleIdForAddressAndIndex(
       _beneficiary,
       holdersVestingCount[_beneficiary]
@@ -439,7 +418,7 @@ contract BETA_PrismaToken is
     bool isReleasor = (msg.sender == owner);
     require(
       isBeneficiary || isReleasor,
-      "Only beneficiary and owner can release vested tokens"
+      "Only beneficiary and owner can release vested tokens."
     );
     uint256 vestedAmount = _computeReleasableAmount(vestingSchedule);
     require(
@@ -512,10 +491,6 @@ contract BETA_PrismaToken is
     _buyItfFee = newValue;
   }
 
-  function setBuyBurnFee(uint256 newValue) external onlyOwner {
-    _buyBurnFee = newValue;
-  }
-
   function setSellLiquidityFee(uint256 newValue) external onlyOwner {
     _sellLiquidityFee = newValue;
   }
@@ -526,10 +501,6 @@ contract BETA_PrismaToken is
 
   function setSellItfFee(uint256 newValue) external onlyOwner {
     _sellItfFee = newValue;
-  }
-
-  function setSellBurnFee(uint256 newValue) external onlyOwner {
-    _sellBurnFee = newValue;
   }
 
   function setMinSwapFees(uint256 newValue) external onlyOwner {
@@ -546,7 +517,7 @@ contract BETA_PrismaToken is
   function updatePrismaDividendTracker(address newAddress) external onlyOwner {
     require(
       newAddress != address(_prismaDividendTracker),
-      "The dividend tracker already has that address"
+      "The dividend tracker already has that address."
     );
     IPrismaDividendTracker new_IPrismaDividendTracker = IPrismaDividendTracker(
       newAddress
@@ -555,10 +526,6 @@ contract BETA_PrismaToken is
       address(new_IPrismaDividendTracker)
     );
     new_IPrismaDividendTracker.excludeFromDividends(address(this));
-    emit PrismaDividendTracker_Updated(
-      newAddress,
-      address(new_IPrismaDividendTracker)
-    );
     _prismaDividendTracker = new_IPrismaDividendTracker;
   }
 
@@ -588,11 +555,11 @@ contract BETA_PrismaToken is
   ////////////////////////
 
   function getTotalBuyFees() public view returns (uint256) {
-    return _buyLiquidityFee + _buyTreasuryFee + _buyItfFee + _buyBurnFee;
+    return _buyLiquidityFee + _buyTreasuryFee + _buyItfFee;
   }
 
   function getTotalSellFees() public view returns (uint256) {
-    return _sellLiquidityFee + _sellTreasuryFee + _sellItfFee + _sellBurnFee;
+    return _sellLiquidityFee + _sellTreasuryFee + _sellItfFee;
   }
 
   function getBuyLiquidityFee() external view returns (uint256) {
@@ -607,10 +574,6 @@ contract BETA_PrismaToken is
     return _buyItfFee;
   }
 
-  function getBuyBurnFee() external view returns (uint256) {
-    return _buyBurnFee;
-  }
-
   function getSellLiquidityFee() external view returns (uint256) {
     return _sellLiquidityFee;
   }
@@ -623,16 +586,12 @@ contract BETA_PrismaToken is
     return _sellItfFee;
   }
 
-  function getSellBurnFee() external view returns (uint256) {
-    return _sellBurnFee;
+  function getMinSwapFees() external view returns (uint256) {
+    return _minSwapFees;
   }
 
   function getOwner() external view returns (address) {
     return owner();
-  }
-
-  function getMultisig() external view returns (address) {
-    return _multisig;
   }
 
   function getTreasuryReceiver() external view returns (address) {
@@ -641,10 +600,6 @@ contract BETA_PrismaToken is
 
   function getItfReceiver() external view returns (address) {
     return _itfReceiver;
-  }
-
-  function getBurnReceiver() external view returns (address) {
-    return _burnReceiver;
   }
 
   function getPrismaDividendTracker() external view returns (address pair) {

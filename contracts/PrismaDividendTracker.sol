@@ -28,13 +28,17 @@ contract BETA_PrismaDividendTracker is
   IterableMapping.Map private _tokenHoldersMap;
 
   /////////////////
-  /// VARIABLES ///
+  /// CONSTANTS ///
   /////////////////
 
   /**
-   * @dev With `magnitude`, we can properly distribute dividends even if the amount of received ether is small.
+   * @dev With `magnitude`, we can properly distribute dividends even if the received amount is small.
    */
   uint256 private constant _magnitude = 2 ** 128;
+
+  /////////////////
+  /// VARIABLES ///
+  /////////////////
 
   uint256 private _magnifiedPrismaPerShare;
   uint256 private _magnifiedDividendPerShare;
@@ -66,29 +70,7 @@ contract BETA_PrismaDividendTracker is
   IPrismaToken private _prisma;
   IUniswapV2Router02 private _router;
 
-  address private _pair;
   address private _dividendToken;
-
-  //////////////
-  /// Events ///
-  //////////////
-
-  event DividendsDistributed(address indexed from, uint256 weiAmount);
-  event DividendWithdrawn(address indexed to, uint256 weiAmount);
-  event ExcludeFromDividends(address indexed account);
-  event DividendReinvested(address indexed to, uint256 weiAmount);
-  event ClaimWaitUpdated(uint256 indexed newValue, uint256 indexed oldValue);
-  event Claim(address indexed account, uint256 amount, bool indexed automatic);
-  event Reinvested(
-    address indexed account,
-    uint256 amount,
-    uint256 received,
-    bool indexed automatic
-  );
-  event GasForProcessing_Updated(
-    uint256 indexed newValue,
-    uint256 indexed oldValue
-  );
 
   ///////////////////
   /// INITIALIZER ///
@@ -96,7 +78,7 @@ contract BETA_PrismaDividendTracker is
 
   /**
    * @notice Creates an ERC20 token that will be used to track dividends
-   * @dev Sets minimum wait between dividend claims and minimum balance to be eligible
+   * @dev Sets minimum balance to be eligible
    */
   function init(
     address dividendToken_,
@@ -108,13 +90,9 @@ contract BETA_PrismaDividendTracker is
     _dividendToken = dividendToken_;
     _prisma = IPrismaToken(prisma_);
     _router = IUniswapV2Router02(router_);
-    _pair = IUniswapV2Factory(_router.factory()).createPair(
-      prisma_,
-      _dividendToken
-    );
 
-    _minimumTokenBalanceForDividends = 1000 * (10 ** 18);
-    _gasForProcessing = 10_000_000;
+    _minimumTokenBalanceForDividends = 1_000 * (10 ** 18);
+    _gasForProcessing = 2_000_000;
   }
 
   /////////////
@@ -197,9 +175,8 @@ contract BETA_PrismaDividendTracker is
     uint256 balance = ERC20Upgradeable(address(_prisma)).balanceOf(
       address(this)
     );
-    uint256 liquidityFee = (_prisma.getSellLiquidityFee() * balance) / 100;
-    uint256 burnFee = (_prisma.getSellBurnFee() * balance) / 100;
-    uint256 swapAmount = balance - liquidityFee - burnFee;
+    uint256 liquidityPrisma = (_prisma.getSellLiquidityFee() * balance) / 100;
+    uint256 swapAmount = balance - liquidityPrisma;
 
     ERC20Upgradeable(address(_prisma)).approve(address(_router), swapAmount);
     address[] memory path = new address[](2);
@@ -217,26 +194,22 @@ contract BETA_PrismaDividendTracker is
     );
     uint256 collectedFees = balanceAfter - balanceBefore;
 
-    if (burnFee > 0) {
-      super._transfer(address(this), address(0x0), burnFee);
-    }
-
-    uint256 liquidityBNB = (collectedFees * (_prisma.getSellLiquidityFee())) /
+    uint256 liquidityFee = (collectedFees * (_prisma.getSellLiquidityFee())) /
       (_prisma.getTotalSellFees());
-    if (liquidityBNB > 5) {
+    if (liquidityFee > 5) {
       ERC20Upgradeable(address(_prisma)).approve(
         address(_router),
-        liquidityFee
+        liquidityPrisma
       );
       ERC20Upgradeable(address(_dividendToken)).approve(
         address(_router),
-        liquidityBNB
+        liquidityFee
       );
       (, uint256 amountB, ) = _router.addLiquidity(
         address(_prisma),
         _dividendToken,
+        liquidityPrisma,
         liquidityFee,
-        liquidityBNB,
         0,
         0,
         msg.sender,
@@ -245,40 +218,16 @@ contract BETA_PrismaDividendTracker is
       collectedFees -= amountB;
     }
 
-    if (burnFee > 0) {
-      uint256 burnBNB = (collectedFees * (_prisma.getSellBurnFee())) /
-        (_prisma.getTotalSellFees());
-      ERC20Upgradeable(_dividendToken).transfer(
-        _prisma.getBurnReceiver(),
-        burnBNB
-      );
-      // (bool success_, ) = address(burnReceiver).call{value: burnBNB}("");
-      // if (success_) {
-      //   emit BurnFeeCollected(burnBNB);
-      // }
-      collectedFees -= burnBNB;
-    }
-
-    uint256 treasuryBNB = (collectedFees * (_prisma.getSellTreasuryFee())) /
+    uint256 treasuryFee = (collectedFees * (_prisma.getSellTreasuryFee())) /
       (_prisma.getTotalSellFees());
     ERC20Upgradeable(_dividendToken).transfer(
       _prisma.getTreasuryReceiver(),
-      treasuryBNB
+      treasuryFee
     );
-    // (bool _success, ) = address(treasuryReceiver).call{value: treasuryBNB}("");
-    // if (_success) {
-    //   emit TreasuryFeeCollected(treasuryBNB);
-    // }
-    collectedFees -= treasuryBNB;
+    collectedFees -= treasuryFee;
 
-    // uint256 itfBNB = (collectedFees * (_prisma.getSellItfFee())) /
-    //   (_prisma.getTotalSellFees());
-    uint256 itfBNB = collectedFees;
-    ERC20Upgradeable(_dividendToken).transfer(_prisma.getItfReceiver(), itfBNB);
-    // (bool _success, ) = address(itfReceiver).call{value: itfBNB}("");
-    // if (_success) {
-    //   emit itfFeeCollected(itfBNB);
-    // }
+    uint256 itfFee = collectedFees;
+    ERC20Upgradeable(_dividendToken).transfer(_prisma.getItfReceiver(), itfFee);
   }
 
   //////////////////////////////
@@ -318,19 +267,18 @@ contract BETA_PrismaDividendTracker is
   }
 
   /**
-   * @notice Distributes ether to token holders as dividends.
+   * @notice Distributes stablecoins to token holders as dividends.
    * @dev It reverts if the total supply of tokens is 0.
-   * It emits the `DividendsDistributed` event if the amount of received ether is greater than 0.
-   * About undistributed ether:
-   *   In each distribution, there is a small amount of ether not distributed,
+   * About undistributed stablecoins:
+   *   In each distribution, there is a small amount of stablecoins not distributed,
    *     the magnified amount of which is
-   *     `(msg.value * magnitude) % totalSupply()`.
-   *   With a well-chosen `magnitude`, the amount of undistributed ether
+   *     `(amount * magnitude) % totalSupply()`.
+   *   With a well-chosen `magnitude`, the amount of undistributed stablecoins
    *     (de-magnified) in a distribution can be less than 1 wei.
-   *   We can actually keep track of the undistributed ether in a distribution
+   *   We can actually keep track of the undistributed stablecoins in a distribution
    *     and try to distribute it in the next distribution,
    *     but keeping track of such data on-chain costs much more than
-   *     the saved ether, so we don't do that.
+   *     the saved stablecoins, so we don't do that.
    */
   function distributeDividends(bool processDividends) external {
     require(msg.sender == _prisma.getOwner(), "Not owner.");
@@ -340,8 +288,6 @@ contract BETA_PrismaDividendTracker is
       _lastDistribution;
     if (amount > 0) {
       _magnifiedDividendPerShare += (amount * _magnitude) / totalSupply();
-
-      emit DividendsDistributed(msg.sender, amount);
 
       _totalDividendsDistributed += amount;
 
@@ -393,10 +339,10 @@ contract BETA_PrismaDividendTracker is
       address account = _tokenHoldersMap.keys[lastProcessedIndex];
 
       if (reinvesting) {
-        if (processReinvest(account, true)) {
+        if (processReinvest(account)) {
           claims++;
         }
-      } else if (processAccount(account, true, 0)) {
+      } else if (processAccount(account, 0)) {
         claims++;
       }
 
@@ -418,12 +364,10 @@ contract BETA_PrismaDividendTracker is
 
   /**
    * @notice Processes dividends for an account
-   * @dev Emits a `Claim` event
    * @return bool success
    */
   function processAccount(
     address account,
-    bool automatic,
     uint256 amount
   ) internal returns (bool) {
     uint256 _amount;
@@ -439,12 +383,16 @@ contract BETA_PrismaDividendTracker is
     }
 
     if (_amount > 0) {
-      emit Claim(account, _amount, automatic);
       return true;
     }
 
     return false;
   }
+
+  /**
+   * @notice Allows a user to manually withdraw their own dividends
+   * @return bool success
+   */
 
   function claim(uint256 amount) external returns (bool) {
     address account = msg.sender;
@@ -462,7 +410,6 @@ contract BETA_PrismaDividendTracker is
 
     if (_amount > 0) {
       _lastDistribution -= _amount;
-      emit Claim(account, _amount, false);
       return true;
     }
 
@@ -470,8 +417,7 @@ contract BETA_PrismaDividendTracker is
   }
 
   /**
-   * @notice Withdraws the ether distributed to the sender.
-   * @dev It emits a `DividendWithdrawn` event if the amount of withdrawn ether is greater than 0.
+   * @notice Withdraws the stablecoins distributed to the sender.
    */
 
   function _withdrawDividendOfUser(
@@ -490,8 +436,6 @@ contract BETA_PrismaDividendTracker is
         return 0;
       }
 
-      emit DividendWithdrawn(user, amount);
-
       return amount;
     }
 
@@ -501,6 +445,10 @@ contract BETA_PrismaDividendTracker is
   ///////////////////////////////
   /// Dividends Reinvestmnent ///
   ///////////////////////////////
+
+  /**
+   * @dev Internal function used to reinvest and compound all the dividends of Prisma stakers
+   */
 
   function autoReinvest() internal {
     uint256 _totalStakedPrisma = _prisma.getTotalStakedAmount();
@@ -529,40 +477,26 @@ contract BETA_PrismaDividendTracker is
         (_contractPrismaBalance * _magnitude) /
         _totalStakedPrisma;
 
-      process(10_000_000, true);
+      process(_gasForProcessing, true);
 
       _magnifiedPrismaPerShare = 0;
 
       _processingAutoReinvest = false;
 
-      // emit DividendsDistributed(msg.sender, _reinvestAmount);
-
-      // totalDividendsDistributed = totalDividendsDistributed + _reinvestAmount;
+      _totalDividendsDistributed += _totalUnclaimedDividend;
     }
   }
 
   /**
-   * @dev This function is used when we process auto reinvest in `_withdrawDividendOfUser`
-   * It add the dividend equivalent to transfered prisma in `withdrawnDividends[user]`
-   * It compound the prisma to user prisma balance
-   *
+   * @dev Internal function used to compound Prisma for `_user`
    */
-  function processReinvest(
-    address _user,
-    bool _automatic
-  ) internal returns (bool) {
+  function processReinvest(address _user) internal returns (bool) {
     uint256 _reinvestableDividend = withdrawableDividendOf(_user);
 
     if (_reinvestableDividend > 0) {
       _withdrawnDividends[_user] += _reinvestableDividend;
       uint256 _prismaToCompound = distributeEarnedPrisma(_user);
       _prisma.compoundPrisma(_user, _prismaToCompound);
-      emit Reinvested(
-        _user,
-        _reinvestableDividend,
-        _prismaToCompound,
-        _automatic
-      );
       return true;
     }
     return false;
@@ -572,10 +506,7 @@ contract BETA_PrismaDividendTracker is
    * @notice Allows users to manually reinvest an arbitrary amount of dividends
    */
   function manualReinvest(uint256 amount) external {
-    require(
-      !_processingAutoReinvest,
-      "Not allowed for now, try after sometime!"
-    );
+    require(!_processingAutoReinvest, "Not allowed now, retry later.");
     uint256 _withdrawableDividend = withdrawableDividendOf(msg.sender);
     if (_withdrawableDividend > 0 && amount <= _withdrawableDividend) {
       uint256 balanceBefore = ERC20Upgradeable(address(_prisma)).balanceOf(
@@ -645,6 +576,9 @@ contract BETA_PrismaDividendTracker is
       ) / _magnitude;
   }
 
+  /**
+   * @notice View the amount of Prisma an address has earned from staking
+   */
   function distributeEarnedPrisma(address _user) public view returns (uint256) {
     uint256 _userStakedPrisma = _prisma.getStakedPrisma(_user);
     uint256 _prismaDividend = (_magnifiedPrismaPerShare * _userStakedPrisma) /
@@ -664,7 +598,7 @@ contract BETA_PrismaDividendTracker is
   ) external onlyOwner {
     require(
       _newMinimumBalance != _minimumTokenBalanceForDividends,
-      "New mimimum balance for dividend cannot be same as current minimum balance"
+      "New mimimum balance for dividend cannot be same as current minimum balance."
     );
     _minimumTokenBalanceForDividends = _newMinimumBalance * (10 ** 18);
   }
@@ -676,14 +610,12 @@ contract BETA_PrismaDividendTracker is
   function excludeFromDividends(address account) external onlyOwner {
     require(
       !_excludedFromDividends[account],
-      "address already excluded from dividends"
+      "Address already excluded from dividends."
     );
     _excludedFromDividends[account] = true;
 
     _setBalance(account, 0);
     _tokenHoldersMap.remove(account);
-
-    emit ExcludeFromDividends(account);
   }
 
   /**
@@ -701,13 +633,15 @@ contract BETA_PrismaDividendTracker is
     _dividendToken = newToken;
   }
 
+  /**
+   * @dev Updates the amount of gas used to process dividends
+   */
   function updateGasForProcessing(uint256 newValue) external onlyOwner {
     require(
       newValue != _gasForProcessing,
-      "Cannot update gasForProcessing to same value"
+      "Cannot update gasForProcessing to same value."
     );
     _gasForProcessing = newValue;
-    emit GasForProcessing_Updated(newValue, _gasForProcessing);
   }
 
   ////////////////////////
@@ -794,6 +728,9 @@ contract BETA_PrismaDividendTracker is
     return getAccount(account);
   }
 
+  /**
+   * @notice Returns the minimum token balance required to be eligible for dividends
+   */
   function getMinBalanceForDividends() external view returns (uint256) {
     return _minimumTokenBalanceForDividends;
   }
