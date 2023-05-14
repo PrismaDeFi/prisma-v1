@@ -5,7 +5,7 @@ const { developmentChains } = require("../helper-hardhat-config")
 module.exports = async ({ deployments }) => {
   const { log } = deployments
 
-  const prismaFactory = await ethers.getContractFactory("BETA_PrismaToken")
+  const prismaFactory = await ethers.getContractFactory("PrismaToken")
   const prismaProxy = await upgrades.deployProxy(prismaFactory)
   await prismaProxy.deployed()
   log("PrismaProxy deployed at", prismaProxy.address)
@@ -15,7 +15,7 @@ module.exports = async ({ deployments }) => {
   }
 
   const trackerFactory = await ethers.getContractFactory(
-    "BETA_PrismaDividendTracker"
+    "PrismaDividendTracker"
   )
   const trackerProxy = await upgrades.deployProxy(trackerFactory)
   await trackerProxy.deployed()

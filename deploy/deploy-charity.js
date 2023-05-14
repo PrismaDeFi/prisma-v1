@@ -6,7 +6,7 @@ module.exports = async ({ deployments }) => {
   const { deploy, log } = deployments
   const [deployer] = await ethers.getSigners()
 
-  const prismaCharity = await deploy("BETA_PrismaCharity", {
+  const prismaCharity = await deploy("PrismaCharity", {
     from: deployer.address,
     args: [],
     log: true,

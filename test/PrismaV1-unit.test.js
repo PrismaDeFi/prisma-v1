@@ -12,11 +12,9 @@ describe("PrismaV1 Test", () => {
 
     await deployments.fixture("all")
 
-    const Prisma = await ethers.getContractFactory("BETA_PrismaToken")
+    const Prisma = await ethers.getContractFactory("PrismaToken")
     prisma = await upgrades.deployProxy(Prisma)
-    const Tracker = await ethers.getContractFactory(
-      "BETA_PrismaDividendTracker"
-    )
+    const Tracker = await ethers.getContractFactory("PrismaDividendTracker")
     tracker = await upgrades.deployProxy(Tracker)
     busd = await ethers.getContract("MockBUSDToken", deployer)
     wbnb = await ethers.getContract("MockWBNBToken", deployer)
@@ -55,8 +53,7 @@ describe("PrismaV1 Test", () => {
 
     await prisma.init(busd.address, tracker.address)
     await tracker.init(busd.address, this.router.address, prisma.address)
-    await tracker.excludeFromDividends(pairAddress)
-    await tracker.transferOwnership(prisma.address)
+    await prisma.excludeFromDividend(pairAddress)
 
     await busd.transfer(tracker.address, ethers.utils.parseEther("1000"))
     await prisma.transfer(prisma.address, ethers.utils.parseEther("100000"))
@@ -215,19 +212,18 @@ describe("PrismaV1 Test", () => {
         prismaUser.transfer(deployer.address, ethers.utils.parseEther("7500"))
       ).to.be.rejectedWith("You need to unstake first")
     })
+    it("cannot set fees above 10%", async () => {
+      await expect(prisma.setBuyItfFee(7)).to.be.rejectedWith(
+        "Cannot set fees higher than 10%"
+      )
+    })
   })
   describe("stakePrisma", () => {
-    it("staking must be enabled", async () => {
-      await prisma.setStakingStatus(false)
-      await expect(
-        prisma.stakePrisma(ethers.utils.parseEther("10000"))
-      ).to.be.revertedWith("Staking is paused.")
-    })
     it("cannot stake more tokens than owned", async () => {
       const prismaUser = prisma.connect(user)
       await expect(
         prismaUser.stakePrisma(ethers.utils.parseEther("10000"))
-      ).to.be.revertedWith("Not enough tokens to stake.")
+      ).to.be.revertedWith("Not enough tokens to stake")
     })
     it("can stake", async () => {
       await prisma.stakePrisma(ethers.utils.parseEther("10000"))
@@ -241,7 +237,7 @@ describe("PrismaV1 Test", () => {
     it("cannot unstake more than staked", async () => {
       await expect(
         prisma.unstakePrisma(ethers.utils.parseEther("10000"))
-      ).to.be.revertedWith("Not enough tokens to unstake.")
+      ).to.be.revertedWith("Not enough tokens to unstake")
     })
     it("can unstake", async () => {
       await prisma.stakePrisma(ethers.utils.parseEther("10000"))
@@ -269,7 +265,7 @@ describe("PrismaV1 Test", () => {
       )
       await expect(
         prisma.release(id, ethers.utils.parseEther("11000"))
-      ).to.be.revertedWith("Insufficient tokens to release available.")
+      ).to.be.revertedWith("Insufficient tokens to release available")
       await prisma.release(id, ethers.utils.parseEther("10000"))
       assert.equal(
         (await prisma.balanceOf(user.address)).toString(),
@@ -277,7 +273,7 @@ describe("PrismaV1 Test", () => {
       )
       await expect(
         prisma.release(id, ethers.utils.parseEther("1000"))
-      ).to.be.revertedWith("Insufficient tokens to release available.")
+      ).to.be.revertedWith("Insufficient tokens to release available")
       await time.increase(3888000)
       await prisma.release(id, ethers.utils.parseEther("45000"))
       assert.equal(
@@ -292,14 +288,16 @@ describe("PrismaV1 Test", () => {
       )
       await expect(
         prisma.release(id, ethers.utils.parseEther("1000"))
-      ).to.be.revertedWith("Insufficient tokens to release available.")
+      ).to.be.revertedWith("Insufficient tokens to release available")
     })
   })
   describe("setBalance", () => {
     it("sets dividends", async () => {
       assert.equal(
         (await prisma.balanceOf(deployer.address)).toString(),
-        (await prisma.prismaDividendTokenBalanceOf(deployer.address)).toString()
+        (
+          await prisma.prismaDividendTrackerBalanceOf(deployer.address)
+        ).toString()
       )
     })
   })
@@ -326,7 +324,7 @@ describe("PrismaV1 Test", () => {
       await tracker.distributeDividends(true)
       await prisma.transfer(user.address, ethers.utils.parseEther("1000000"))
       assert.equal(
-        (await prisma.prismaDividendTokenBalanceOf(user.address)).toString(),
+        (await prisma.prismaDividendTrackerBalanceOf(user.address)).toString(),
         ethers.utils.parseEther("1000000")
       )
       assert.equal(await prisma.withdrawablePrismaDividendOf(user.address), 0)

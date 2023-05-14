@@ -17,6 +17,11 @@ interface IPrismaDividendTracker {
   ) external;
 
   /**
+   * @dev Updates the amount of gas used to process dividends
+   */
+  function updateGasForProcessing(uint256 newValue) external;
+
+  /**
    * @notice Makes an address ineligible for dividends
    * @dev Calls `_setBalance` and updates `tokenHoldersMap` iterable mapping
    */
@@ -83,11 +88,11 @@ interface IPrismaDividendTracker {
 
   /**
    * @notice View the amount of dividend in wei that an address can withdraw.
-   * @param _owner The address of a token holder.
-   * @return The amount of dividend in wei that `_owner` can withdraw.
+   * @param account The address of a token holder.
+   * @return The amount of dividend in wei that `account` can withdraw.
    */
   function withdrawableDividendOf(
-    address _owner
+    address account
   ) external view returns (uint256);
 
   function swapFees() external;

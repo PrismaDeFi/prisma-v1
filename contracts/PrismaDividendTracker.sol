@@ -9,7 +9,6 @@
 
 pragma solidity 0.8.18;
 
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "./IPrismaDividendTracker.sol";
 import "./IterableMapping.sol";
@@ -18,14 +17,10 @@ import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
 import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
-contract BETA_PrismaDividendTracker is
-  IPrismaDividendTracker,
-  ERC20Upgradeable,
-  OwnableUpgradeable
-{
+contract PrismaDividendTracker is IPrismaDividendTracker, ERC20Upgradeable {
   using IterableMapping for IterableMapping.Map;
 
-  IterableMapping.Map private _tokenHoldersMap;
+  IterableMapping.Map private _tokenHoldersMap; // Used to store dividend info for token holders
 
   /////////////////
   /// CONSTANTS ///
@@ -40,15 +35,15 @@ contract BETA_PrismaDividendTracker is
   /// VARIABLES ///
   /////////////////
 
-  uint256 private _magnifiedPrismaPerShare;
-  uint256 private _magnifiedDividendPerShare;
-  uint256 private _lastDistribution;
-  uint256 private _lastProcessedIndex;
-  uint256 private _minimumTokenBalanceForDividends;
-  uint256 private _gasForProcessing;
-  uint256 private _totalDividendsDistributed;
+  uint256 private _magnifiedPrismaPerShare; // Magnified Prisma Tokens per share
+  uint256 private _magnifiedDividendPerShare; // Magnified Dividends per share
+  uint256 private _lastDistribution; // Used to double counting after partial processing of dividends
+  uint256 private _lastProcessedIndex; // Used to resume processing dividends from the last processed account
+  uint256 private _minimumTokenBalanceForDividends; // Minimum token balance to be eligible for dividends
+  uint256 private _gasForProcessing; // Gas used by the contract to process dividends
+  uint256 private _totalDividendsDistributed; // Total amount of dividends distributed
 
-  bool private _processingAutoReinvest;
+  bool private _processingAutoReinvest; // Used to prevent manual reinvestment during the auomated one
 
   /**
    * @dev About dividendCorrection:
@@ -64,28 +59,108 @@ contract BETA_PrismaDividendTracker is
    * So now `dividendOf(_user)` returns the same value before and after `balanceOf(_user)` is changed.
    */
   mapping(address => int256) private _magnifiedDividendCorrections;
-  mapping(address => uint256) private _withdrawnDividends;
-  mapping(address => bool) private _excludedFromDividends;
+  mapping(address => uint256) private _withdrawnDividends; // Total withdrawn dividends by a certain account
+  mapping(address => bool) private _excludedFromDividends; // Used to exclude certain accounts from dividends
 
-  IPrismaToken private _prisma;
-  IUniswapV2Router02 private _router;
+  IPrismaToken private _prisma; // Prisma Token interface
+  IUniswapV2Router02 private _router; // DEX Router interface
 
-  address private _dividendToken;
+  address private _dividendToken; // Address of the token used for payouts
+
+  //////////////
+  /// EVENTS ///
+  //////////////
+
+  /**
+   * @notice Emitted when the minimum token balance for dividends is updated
+   * @param newMinimum The new minimum token balance for dividends
+   * @param oldMinimum The previous minimum token balance for dividends
+   */
+  event MinimumTokenBalanceForDividendsUpdated(
+      uint256 indexed newMinimum,
+      uint256 indexed oldMinimum
+    );
+
+  /**
+   * @notice Emitted when the gas amount for processing is updated
+   * @param newGas The new gas amount for processing
+   * @param oldGas The previous gas amount for processing
+   */
+  event GasForProcessingUpdated(uint256 indexed newGas, uint256 indexed oldGas);
+
+  /**
+   * @notice Emitted when dividends are distributed
+   * @param dividendPerShare The dividend amount per share
+   * @param totalDividendsDistributed The total dividends that have been distributed
+   * @param lastDistribution Distribution offset to avoid double counting
+   */
+  event DividendsDistributed(
+      uint256 indexed dividendPerShare,
+      uint256 indexed totalDividendsDistributed,
+      uint256 indexed lastDistribution
+    );
+
+  /**
+   * @notice Emitted when dividends are withdrawn
+   * @param account The account that withdrew the dividends
+   * @param amount The amount of dividends that were withdrawn
+   */
+  event DividendsWithdrawn(address indexed account, uint256 indexed amount);
+
+  /**
+   * @notice Emitted when dividends are reinvested
+   * @param account The account that reinvested the dividends
+   * @param amount The amount of dividends that were reinvested
+   * @param lastDistribution Distribution offset to avoid double counting
+   * @param manual A flag indicating whether the reinvestment was manual
+   */
+  event DividendsReinvested(
+      address indexed account,
+      uint256 indexed amount,
+      uint256 indexed lastDistribution,
+      bool manual
+    );
+
+  /////////////////
+  /// MODIFIERS ///
+  /////////////////
+
+  /**
+   * @notice Ensures certain functions can only be called by Prisma Token
+   * @dev Throws if called by any account other than `address(_prisma)`
+   */
+  modifier onlyPrisma() {
+    require(msg.sender == address(_prisma), "Caller is not Prisma Token");
+    _;
+  }
 
   ///////////////////
   /// INITIALIZER ///
   ///////////////////
 
   /**
-   * @notice Creates an ERC20 token that will be used to track dividends
-   * @dev Sets minimum balance to be eligible
+   * @notice Initializes the Prisma Tracker with the necessary contract references.
+   * @dev Sets the initial state of the contract, including the minimum token balance to be eligible for dividends.
+   * @param dividendToken_ The address of the ERC20 token that will be used to distribute dividends.
+   * @param router_ The address of the Uniswap router for handling liquidity operations.
+   * @param prisma_ The address of the Prisma Token contract.
+   * 
+   * Requirements:
+   * - `dividendToken_` cannot be the zero address.
+   * - `router_` cannot be the zero address.
+   * - `prisma_` cannot be the zero address.
    */
   function init(
     address dividendToken_,
     address router_,
     address prisma_
   ) public initializer {
-    __Ownable_init();
+    require(
+      dividendToken_ != address(0x0),
+      "Cannot set dividend token as zero address"
+    );
+    require(router_ != address(0x0), "Cannot set router as zero address");
+    require(prisma_ != address(0x0), "Cannot set Prisma Token as zero address");
     __ERC20_init("Prisma Tracker", "PRISMA_TRACKER");
     _dividendToken = dividendToken_;
     _prisma = IPrismaToken(prisma_);
@@ -99,6 +174,10 @@ contract BETA_PrismaDividendTracker is
   /// ERC20 ///
   /////////////
 
+  /**
+   * @notice Returns the balance of a user.
+   * @return uint256 account balance
+   */
   function balanceOf(
     address account
   )
@@ -122,7 +201,7 @@ contract BETA_PrismaDividendTracker is
     address to,
     uint256 value
   ) internal virtual override {
-    require(false); // currently disabled
+    require(false, "Prisma Dividend Tracker transfers are currently disabled");
     super._transfer(from, to, value);
 
     int256 _magCorrection = int(_magnifiedDividendPerShare * value);
@@ -167,7 +246,7 @@ contract BETA_PrismaDividendTracker is
    * being swapped, it is impossible to collect the swapped fees directly in the main contract.
    */
 
-  function swapFees() external onlyOwner {
+  function swapFees() external onlyPrisma {
     uint256 balanceBefore = ERC20Upgradeable(_dividendToken).balanceOf(
       address(this)
     );
@@ -237,7 +316,7 @@ contract BETA_PrismaDividendTracker is
   /**
    * @notice Updates the holders struct
    */
-  function setBalance(address account, uint256 newBalance) external onlyOwner {
+  function setBalance(address account, uint256 newBalance) external onlyPrisma {
     if (_excludedFromDividends[account]) {
       return;
     }
@@ -281,8 +360,8 @@ contract BETA_PrismaDividendTracker is
    *     the saved stablecoins, so we don't do that.
    */
   function distributeDividends(bool processDividends) external {
-    require(msg.sender == _prisma.getOwner(), "Not owner.");
-    require(totalSupply() > 0);
+    require(msg.sender == _prisma.getOwner(), "Not Prisma Token owner");
+    require(totalSupply() > 0, "No one to distribute to");
 
     uint256 amount = ERC20Upgradeable(_dividendToken).balanceOf(address(this)) -
       _lastDistribution;
@@ -298,6 +377,12 @@ contract BETA_PrismaDividendTracker is
 
       _lastDistribution = ERC20Upgradeable(_dividendToken).balanceOf(
         address(this)
+      );
+
+      emit DividendsDistributed(
+        _magnifiedDividendPerShare,
+        _totalDividendsDistributed,
+        _lastDistribution
       );
     }
   }
@@ -421,21 +506,25 @@ contract BETA_PrismaDividendTracker is
    */
 
   function _withdrawDividendOfUser(
-    address user,
+    address account,
     uint256 amount
   ) internal returns (uint256) {
-    uint256 _withdrawableDividend = withdrawableDividendOf(user);
+    uint256 _withdrawableDividend = withdrawableDividendOf(account);
 
     if (_withdrawableDividend > 0 && amount <= _withdrawableDividend) {
-      _withdrawnDividends[user] += amount;
+      _withdrawnDividends[account] += amount;
 
-      bool success = IERC20Upgradeable(_dividendToken).transfer(user, amount);
+      bool success = IERC20Upgradeable(_dividendToken).transfer(
+        account,
+        amount
+      );
 
       if (!success) {
-        _withdrawnDividends[user] = _withdrawnDividends[user] - amount;
+        _withdrawnDividends[account] = _withdrawnDividends[account] - amount;
         return 0;
       }
 
+      emit DividendsWithdrawn(account, amount);
       return amount;
     }
 
@@ -488,15 +577,21 @@ contract BETA_PrismaDividendTracker is
   }
 
   /**
-   * @dev Internal function used to compound Prisma for `_user`
+   * @dev Internal function used to compound Prisma for `account`
    */
-  function processReinvest(address _user) internal returns (bool) {
-    uint256 _reinvestableDividend = withdrawableDividendOf(_user);
+  function processReinvest(address account) internal returns (bool) {
+    uint256 _reinvestableDividend = withdrawableDividendOf(account);
 
     if (_reinvestableDividend > 0) {
-      _withdrawnDividends[_user] += _reinvestableDividend;
-      uint256 _prismaToCompound = distributeEarnedPrisma(_user);
-      _prisma.compoundPrisma(_user, _prismaToCompound);
+      _withdrawnDividends[account] += _reinvestableDividend;
+      uint256 _prismaToCompound = distributeEarnedPrisma(account);
+      _prisma.compoundPrisma(account, _prismaToCompound);
+      emit DividendsReinvested(
+        account,
+        _prismaToCompound,
+        _lastDistribution,
+        false
+      );
       return true;
     }
     return false;
@@ -506,7 +601,7 @@ contract BETA_PrismaDividendTracker is
    * @notice Allows users to manually reinvest an arbitrary amount of dividends
    */
   function manualReinvest(uint256 amount) external {
-    require(!_processingAutoReinvest, "Not allowed now, retry later.");
+    require(!_processingAutoReinvest, "Not allowed now, retry later");
     uint256 _withdrawableDividend = withdrawableDividendOf(msg.sender);
     if (_withdrawableDividend > 0 && amount <= _withdrawableDividend) {
       uint256 balanceBefore = ERC20Upgradeable(address(_prisma)).balanceOf(
@@ -532,6 +627,13 @@ contract BETA_PrismaDividendTracker is
 
       uint256 _userPrisma = balanceAfter - balanceBefore;
       _prisma.compoundPrisma(msg.sender, _userPrisma);
+
+      emit DividendsReinvested(
+        msg.sender,
+        _userPrisma,
+        _lastDistribution,
+        true
+      );
     }
   }
 
@@ -541,46 +643,48 @@ contract BETA_PrismaDividendTracker is
 
   /**
    * @notice View the amount of dividend in wei that an address can withdraw.
-   * @param _owner The address of a token holder.
-   * @return The amount of dividend in wei that `_owner` can withdraw.
+   * @param account The address of a token holder.
+   * @return The amount of dividend in wei that `account` can withdraw.
    */
   function withdrawableDividendOf(
-    address _owner
+    address account
   ) public view returns (uint256) {
-    return accumulativeDividendOf(_owner) - _withdrawnDividends[_owner];
+    return accumulativeDividendOf(account) - _withdrawnDividends[account];
   }
 
   /**
    * @notice View the amount of dividend in wei that an address has withdrawn.
-   * @param _owner The address of a token holder.
-   * @return The amount of dividend in wei that `_owner` has withdrawn.
+   * @param account The address of a token holder.
+   * @return The amount of dividend in wei that `account` has withdrawn.
    */
-  function withdrawnDividendOf(address _owner) public view returns (uint256) {
-    return _withdrawnDividends[_owner];
+  function withdrawnDividendOf(address account) public view returns (uint256) {
+    return _withdrawnDividends[account];
   }
 
   /**
    * @notice View the amount of dividend in wei that an address has earned in total.
-   * @dev accumulativeDividendOf(_owner) = withdrawableDividendOf(_owner) + withdrawnDividendOf(_owner)
-   * = (magnifiedDividendPerShare * balanceOf(_owner) + magnifiedDividendCorrections[_owner]) / magnitude
-   * @param _owner The address of a token holder.
-   * @return The amount of dividend in wei that `_owner` has earned in total.
+   * @dev accumulativeDividendOf(account) = withdrawableDividendOf(account) + withdrawnDividendOf(account)
+   * = (magnifiedDividendPerShare * balanceOf(account) + magnifiedDividendCorrections[account]) / magnitude
+   * @param account The address of a token holder.
+   * @return The amount of dividend in wei that `account` has earned in total.
    */
   function accumulativeDividendOf(
-    address _owner
+    address account
   ) public view returns (uint256) {
     return
       uint(
-        int(_magnifiedDividendPerShare * balanceOf(_owner)) +
-          _magnifiedDividendCorrections[_owner]
+        int(_magnifiedDividendPerShare * balanceOf(account)) +
+          _magnifiedDividendCorrections[account]
       ) / _magnitude;
   }
 
   /**
    * @notice View the amount of Prisma an address has earned from staking
    */
-  function distributeEarnedPrisma(address _user) public view returns (uint256) {
-    uint256 _userStakedPrisma = _prisma.getStakedPrisma(_user);
+  function distributeEarnedPrisma(
+    address account
+  ) public view returns (uint256) {
+    uint256 _userStakedPrisma = _prisma.getStakedPrisma(account);
     uint256 _prismaDividend = (_magnifiedPrismaPerShare * _userStakedPrisma) /
       _magnitude;
     return _prismaDividend;
@@ -594,23 +698,28 @@ contract BETA_PrismaDividendTracker is
    * @notice Updates the minimum balance required to be eligible for dividends
    */
   function updateMinimumTokenBalanceForDividends(
-    uint256 _newMinimumBalance
-  ) external onlyOwner {
+    uint256 newMinimumBalance
+  ) external onlyPrisma {
+    uint256 oldMinimumBalance = _minimumTokenBalanceForDividends;
     require(
-      _newMinimumBalance != _minimumTokenBalanceForDividends,
-      "New mimimum balance for dividend cannot be same as current minimum balance."
+      newMinimumBalance != oldMinimumBalance,
+      "New mimimum balance for dividend cannot be same as current minimum balance"
     );
-    _minimumTokenBalanceForDividends = _newMinimumBalance * (10 ** 18);
+    _minimumTokenBalanceForDividends = newMinimumBalance * (10 ** 18);
+    emit MinimumTokenBalanceForDividendsUpdated(
+      newMinimumBalance,
+      oldMinimumBalance
+    );
   }
 
   /**
    * @notice Makes an address ineligible for dividends
    * @dev Calls `_setBalance` and updates `tokenHoldersMap` iterable mapping
    */
-  function excludeFromDividends(address account) external onlyOwner {
+  function excludeFromDividends(address account) external onlyPrisma {
     require(
       !_excludedFromDividends[account],
-      "Address already excluded from dividends."
+      "Address already excluded from dividends"
     );
     _excludedFromDividends[account] = true;
 
@@ -621,7 +730,7 @@ contract BETA_PrismaDividendTracker is
   /**
    * @notice Makes an address eligible for dividends
    */
-  function includeFromDividends(address account) external onlyOwner {
+  function includeFromDividends(address account) external onlyPrisma {
     _excludedFromDividends[account] = false;
   }
 
@@ -629,19 +738,21 @@ contract BETA_PrismaDividendTracker is
    * @notice Sets the address for the token used for dividend payout
    * @dev This should be an ERC20 token
    */
-  function setDividendTokenAddress(address newToken) external onlyOwner {
+  function setDividendTokenAddress(address newToken) external onlyPrisma {
     _dividendToken = newToken;
   }
 
   /**
    * @dev Updates the amount of gas used to process dividends
    */
-  function updateGasForProcessing(uint256 newValue) external onlyOwner {
+  function updateGasForProcessing(uint256 newValue) external onlyPrisma {
+    uint256 oldValue = _gasForProcessing;
     require(
-      newValue != _gasForProcessing,
-      "Cannot update gasForProcessing to same value."
+      newValue != oldValue,
+      "Cannot update gasForProcessing to same value"
     );
     _gasForProcessing = newValue;
+    emit GasForProcessingUpdated(newValue, oldValue);
   }
 
   ////////////////////////
