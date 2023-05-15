@@ -564,14 +564,14 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
   /**
    * @notice Changes the buy liquidity fee to a new value
-   * @dev Can only be called by the owner. Ensures that the total of buy and sell fees is less than 10%
+   * @dev Can only be called by the owner. Ensures that the total of buy and sell fees is less than or equal to 10%
    * @param newValue The new value for the buy liquidity fee
    */
   function setBuyLiquidityFee(uint256 newValue) external onlyOwner {
     uint256 oldValue = _buyLiquidityFee;
     _buyLiquidityFee = newValue;
     require(
-      getTotalBuyFees() + getTotalSellFees() < 10,
+      getTotalBuyFees() + getTotalSellFees() <= 10,
       "Cannot set fees higher than 10%"
     );
     emit BuyLiquidityFeeUpdated(newValue, oldValue);
@@ -579,14 +579,14 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
   /**
    * @notice Changes the buy treasury fee to a new value
-   * @dev Can only be called by the owner. Ensures that the total of buy and sell fees is less than 10%
+   * @dev Can only be called by the owner. Ensures that the total of buy and sell fees is less than or equal to 10%
    * @param newValue The new value for the buy treasury fee
    */
   function setBuyTreasuryFee(uint256 newValue) external onlyOwner {
     uint256 oldValue = _buyTreasuryFee;
     _buyTreasuryFee = newValue;
     require(
-      getTotalBuyFees() + getTotalSellFees() < 10,
+      getTotalBuyFees() + getTotalSellFees() <= 10,
       "Cannot set fees higher than 10%"
     );
     emit BuyTreasuryFeeUpdated(newValue, oldValue);
@@ -594,14 +594,14 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
   /**
    * @notice Changes the buy ITF fee to a new value
-   * @dev Can only be called by the owner. Ensures that the total of buy and sell fees is less than 10%
+   * @dev Can only be called by the owner. Ensures that the total of buy and sell fees is less than or equal to 10%
    * @param newValue The new value for the buy ITF fee
    */
   function setBuyItfFee(uint256 newValue) external onlyOwner {
     uint256 oldValue = _buyItfFee;
     _buyItfFee = newValue;
     require(
-      getTotalBuyFees() + getTotalSellFees() < 10,
+      getTotalBuyFees() + getTotalSellFees() <= 10,
       "Cannot set fees higher than 10%"
     );
     emit BuyItfFeeUpdated(newValue, oldValue);
@@ -609,14 +609,14 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
   /**
    * @notice Changes the sell liquidity fee to a new value
-   * @dev Can only be called by the owner. Ensures that the total of buy and sell fees is less than 10%
+   * @dev Can only be called by the owner. Ensures that the total of buy and sell fees is less than or equal to 10%
    * @param newValue The new value for the sell liquidity fee
    */
   function setSellLiquidityFee(uint256 newValue) external onlyOwner {
     uint256 oldValue = _sellLiquidityFee;
     _sellLiquidityFee = newValue;
     require(
-      getTotalBuyFees() + getTotalSellFees() < 10,
+      getTotalBuyFees() + getTotalSellFees() <= 10,
       "Cannot set fees higher than 10%"
     );
     emit SellLiquidityFeeUpdated(newValue, oldValue);
@@ -624,14 +624,14 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
   /**
    * @notice Changes the sell treasury fee to a new value
-   * @dev Can only be called by the owner. Ensures that the total of buy and sell fees is less than 10%
+   * @dev Can only be called by the owner. Ensures that the total of buy and sell fees is less than or equal to 10%
    * @param newValue The new value for the sell treasury fee
    */
   function setSellTreasuryFee(uint256 newValue) external onlyOwner {
     uint256 oldValue = _sellTreasuryFee;
     _sellTreasuryFee = newValue;
     require(
-      getTotalBuyFees() + getTotalSellFees() < 10,
+      getTotalBuyFees() + getTotalSellFees() <= 10,
       "Cannot set fees higher than 10%"
     );
     emit SellTreasuryFeeUpdated(newValue, oldValue);
@@ -639,14 +639,14 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
 
   /**
    * @notice Changes the sell ITF fee to a new value
-   * @dev Can only be called by the owner. Ensures that the total of buy and sell fees is less than 10%
+   * @dev Can only be called by the owner. Ensures that the total of buy and sell fees is less than or equal to 10%
    * @param newValue The new value for the sell ITF fee
    */
   function setSellItfFee(uint256 newValue) external onlyOwner {
     uint256 oldValue = _sellItfFee;
     _sellItfFee = newValue;
     require(
-      getTotalBuyFees() + getTotalSellFees() < 10,
+      getTotalBuyFees() + getTotalSellFees() <= 10,
       "Cannot set fees higher than 10%"
     );
     emit SellItfFeeUpdated(newValue, oldValue);
