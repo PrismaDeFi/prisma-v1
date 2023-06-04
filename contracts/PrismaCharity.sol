@@ -18,7 +18,7 @@ contract PrismaCharity is Ownable {
    * @dev Points at the Prisma Token Proxy
    */
   address private constant _prismaProxy =
-    0xB7ED90F0BE22c7942133404474c7c41199C08a2D;
+    0x00b43413D3F2Ed9B09Dd88250Fa5DD58e44AD123;
 
   /**
    * @notice Retrieves ERC20 tokens from this contract and sends them to another address

@@ -73,10 +73,10 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
    * @param prismaCompounded The amount of Prisma that was compounded
    */
   event PrismaCompounded(
-      uint256 indexed totalStakedAmount,
-      address indexed staker,
-      uint256 indexed prismaCompounded
-    );
+    uint256 indexed totalStakedAmount,
+    address indexed staker,
+    uint256 indexed prismaCompounded
+  );
 
   /**
    * @notice Emitted when a new vesting schedule is created
@@ -86,11 +86,11 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
    * @param scheduleId The unique identifier for this vesting schedule
    */
   event VestingScheduleCreated(
-      uint256 indexed totalVestingAmount,
-      address indexed beneficiary,
-      uint256 indexed vestedAmount,
-      bytes32 scheduleId
-    );
+    uint256 indexed totalVestingAmount,
+    address indexed beneficiary,
+    uint256 indexed vestedAmount,
+    bytes32 scheduleId
+  );
 
   /**
    * @notice Emitted when the buy fee for the liquidity is updated
@@ -169,9 +169,8 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     __Ownable_init();
     __ERC20_init("Prisma Finance", "PRISMA");
 
-    // LOCAL TESTNET ONLY
-    _treasuryReceiver = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
-    _itfReceiver = 0x90F79bf6EB2c4f870365E785982E1f101E93b906;
+    _treasuryReceiver = 0x0b1351397aB42A99470E981e2aC8b4a5e5EFe36f;
+    _itfReceiver = 0x244b0ac0869bB98E1Fb0A509583eF3DcC65609c6;
 
     _totalSupply_ = 10_000_000 * (10 ** 18);
     _minSwapFees = 1_000 * (10 ** 18);

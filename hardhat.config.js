@@ -10,6 +10,7 @@ require("dotenv").config()
 
 const BSC_RPC_URL = process.env.BSC_RPC_URL
 const PRIVATE_KEY = process.env.PRIVATE_KEY
+const DEPLOYER_KEY = process.env.DEPLOYER_KEY
 const BSCSCAN_API_KEY = process.env.BSCSCAN_API_KEY
 
 module.exports = {
@@ -31,6 +32,12 @@ module.exports = {
       accounts: [PRIVATE_KEY],
       saveDeployments: true,
       chainId: 97,
+    },
+    mainnet: {
+      url: "https://bsc-dataseed.binance.org/",
+      chainId: 56,
+      gasPrice: 20000000000,
+      accounts: [DEPLOYER_KEY],
     },
   },
   etherscan: {

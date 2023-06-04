@@ -8,4 +8,5 @@ notes.md
 #Hardhat files
 cache
 artifacts
-
+.openzeppelin
+deployments
