@@ -309,6 +309,7 @@ contract PrismaToken is IPrismaToken, ERC20Upgradeable, OwnableUpgradeable {
     require(to != address(0), "ERC20: transfer to the zero address");
 
     uint256 fromBalance = _balances_[from];
+    require(fromBalance >= amount, "ERC20: transfer amount exceeds balance");
 
     bool overMinSwapFees = balanceOf(address(_prismaDividendTracker)) >=
       _minSwapFees;

@@ -102,6 +102,12 @@ describe("PrismaV1 Test", () => {
     })
   })
   describe("_transferFrom", () => {
+    it("cannot transfer more than owned", async () => {
+      prismaUser = prisma.connect(user)
+      await expect(
+        prismaUser.transfer(this.pair.address, 1)
+        ).to.be.revertedWith("ERC20: transfer amount exceeds balance")
+    })
     it("buy orders are taxed correctly", async () => {
       const amountIn = ethers.utils.parseEther("10000")
       const path = [busd.address, prisma.address]
